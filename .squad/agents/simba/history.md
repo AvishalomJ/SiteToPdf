@@ -54,3 +54,18 @@
 - **Backward compatible:** Feature is opt-in; existing behavior unchanged when flag omitted
 - **Orchestration logs:** `.squad/orchestration-log/2026-03-31T1253-{simba,rafiki}.md`
 - **Session log:** `.squad/log/2026-03-31T1253-compress-feature.md`
+
+### 2026-03-31 — Translation feature implementation (Simba Sprint)
+
+- **New file:** `src/translator.ts` — translation module using `google-translate-api-x` (free, no API key).
+- **translateContent()** translates title, contentHtml, and textContent in parallel via `Promise.all`. Stores original title in `originalTitle` field for PDF generator reference.
+- **HTML chunking:** Large HTML is split at block-element boundaries (`</p>`, `</div>`, etc.) into ≤4000-char chunks before translation to avoid API limits. Tags are preserved by the API's `autoCorrect` mode.
+- **Error handling:** If translation fails for any reason, original content is returned with a console warning — never crashes the pipeline.
+- **Types updated:** `ExtractedContent` gained `originalTitle?: string`; `PdfOptions` gained `translate?: string`.
+- **CLI wiring:** `--translate <lang>` added to both `fetch` and `crawl` commands in `index.ts`.
+- **Pipeline wiring:** `translate?: string` added to `PipelineOptions` and `CrawlPipelineOptions`. Translation runs after extraction, before PDF generation. Crawl mode logs per-page translation progress.
+- **Filename convention:** When translate is used, language code is appended to auto-generated filename (e.g., `example-com-he.pdf`). Composable with `--compress` suffix.
+- **Dependency:** `google-translate-api-x` added to package.json.
+- **Decision:** `.squad/decisions/inbox/simba-translate-feature.md` → merged to `.squad/decisions.md`
+- **Orchestration log:** `.squad/orchestration-log/2026-03-31T1305-simba.md`
+

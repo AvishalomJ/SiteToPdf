@@ -76,3 +76,33 @@
 - **Backward compatible:** Feature is opt-in; existing behavior unchanged when flag omitted
 - **Orchestration logs:** `.squad/orchestration-log/2026-03-31T1253-{simba,rafiki}.md`
 - **Session log:** `.squad/log/2026-03-31T1253-compress-feature.md`
+
+### 2026-03-31 — RTL (Right-to-Left) support for Hebrew translation
+
+**Context:** Added RTL layout support to the PDF generator for the `--translate he` feature. When `options.translate` is set to an RTL language (he, ar, fa, ur), the entire PDF layout flips to right-to-left.
+
+**Implementation:**
+- `isRtlLanguage(lang?)` helper detects RTL language codes (he, ar, fa, ur)
+- `buildRtlStyles(compress?)` generates CSS overlay layered on top of base styles:
+  - Body: `direction: rtl; text-align: right;` with Hebrew-friendly font stack (`Segoe UI`, `Arial Hebrew`, `Noto Sans Hebrew`)
+  - Line-height bumped to 1.8 (normal) / 1.45 (compressed) for Hebrew readability
+  - List padding swapped from left to right, blockquote border flipped to right side
+  - TOC list padding swapped
+  - Code blocks (`pre`, `code`) forced LTR with `unicode-bidi: bidi-override`
+  - URLs and technical content (`a[href]`, `.page-url`, `.toc-url`) forced LTR with `unicode-bidi: embed`
+  - Cover page explicitly keeps `text-align: center`
+- `wrapInHtmlDocument()` and `wrapMultiPageDocument()` accept optional `translate` parameter:
+  - Sets `<html lang="{lang}" dir="rtl">` for RTL languages
+  - Concatenates RTL styles after base styles (CSS cascade override)
+- Bilingual title display: when `content.originalTitle` is present and RTL is active, shows translated title as main H1 and original title below in 9pt italic gray annotation (`Original: {source title}`)
+- Header/footer templates accept `rtl` flag: header gets `direction: rtl`, footer text-align switches to `right`
+- `generatePdf()` and `generateMultiPagePdf()` read `options.translate`, derive `rtl` flag, and pass through to all sub-functions
+- **Backward compatible:** Default (no translate) behavior is unchanged. `PDF_STYLES` and `COMPRESSED_STYLES` constants untouched.
+- **Compress + RTL:** Both modes compose cleanly — compressed sizing with RTL layout and adjusted line-height (1.45 instead of 1.8)
+
+**Key design choice:** RTL styles are a CSS overlay, not a separate complete stylesheet. This avoids duplicating the ~300 lines of base styles and ensures future style changes automatically carry over to RTL mode. The `buildRtlStyles()` function adjusts line-height and blockquote padding based on compress mode for correct proportional scaling.
+
+- **Decision:** `.squad/decisions/inbox/rafiki-rtl-support.md` → merged to `.squad/decisions.md`
+- **Orchestration log:** `.squad/orchestration-log/2026-03-31T1305-rafiki.md`
+- **Session log:** `.squad/log/2026-03-31T1305-translate-feature.md`
+

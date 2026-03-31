@@ -101,6 +101,65 @@ The extractor uses a **3-strategy cascade**:
 - The scoring approach handles most real-world sites but may misfire on single-page apps where content is deeply nested in anonymous divs. Phase 2 crawling (with Playwright-rendered HTML) should mitigate this.
 - The `baseUrl` parameter for `extractContent()` is optional and backward-compatible. Pipeline should pass `fetchResult.url` when available for best results with relative URLs.
 
+### Translation Feature Architecture
+
+**Author:** Simba  
+**Date:** 2026-03-31  
+**Status:** Implemented
+
+#### Context
+
+AvishalomJ requested Hebrew translation support. The feature needs to translate page content before PDF generation, using a free translation API with no key required.
+
+#### Decision
+
+- **Translation library:** `google-translate-api-x` — free, no API key, uses Google Translate under the hood.
+- **Module boundary:** New `src/translator.ts` module owns all translation logic. Pipeline calls it between extraction and PDF generation.
+- **Original title preserved:** `ExtractedContent.originalTitle` field stores the pre-translation title so the PDF generator (Rafiki) can use it for reference annotations.
+- **HTML handling:** HTML is translated with tags preserved via the API's `autoCorrect` mode. Large HTML is chunked at block-element boundaries (≤4000 chars) to avoid API limits.
+- **Error resilience:** Translation failure returns original content with a warning — never blocks PDF generation.
+- **CLI surface:** `--translate <lang>` on both `fetch` and `crawl` commands. Language code appended to auto-generated filenames (e.g., `-he`).
+- **PdfOptions.translate:** Passes the target language code through to the PDF generator so Rafiki can apply RTL styling when `translate === 'he'` (or other RTL languages).
+
+#### Implications
+
+- Rafiki's `pdf-generator.ts` can read `PdfOptions.translate` and `ExtractedContent.originalTitle` to handle RTL layout and title annotations independently.
+- Translation adds latency (one API call per content field per page). Crawl mode translates pages sequentially to avoid rate limiting.
+- The `google-translate-api-x` package is free but unofficial — may break if Google changes their API. Error handling ensures graceful degradation.
+
+### RTL Layout Support in PDF Generator
+
+**Author:** Rafiki (Content Dev)  
+**Date:** 2026-03-31
+**Status:** Implemented
+
+#### Context
+
+The `--translate he` feature requires Hebrew-friendly PDF output. Hebrew is a right-to-left language, so the entire page layout — text alignment, list indentation, blockquote borders — must flip direction. At the same time, code blocks and URLs must remain LTR (code is universal, URLs are always left-to-right).
+
+#### Decision
+
+RTL is implemented as a **CSS overlay** pattern rather than a separate complete stylesheet:
+
+1. `buildRtlStyles(compress)` generates additional CSS rules that override directional properties from the base styles (`PDF_STYLES` or `COMPRESSED_STYLES`).
+2. The overlay is concatenated after the base styles, relying on CSS cascade for specificity.
+3. RTL detection uses `isRtlLanguage()` which supports `he`, `ar`, `fa`, `ur` — extensible for future languages.
+4. The `<html>` element gets `lang` and `dir="rtl"` attributes for proper browser rendering.
+5. Bilingual titles (translated + original) are shown when `originalTitle` is present on `ExtractedContent`.
+
+#### Rationale
+
+- **Overlay vs. duplicate:** Duplicating 300+ lines of base CSS for an RTL variant would be a maintenance burden. Any style fix would need to be applied twice. The overlay approach keeps RTL as a ~60-line additive layer.
+- **Font stack:** `'Segoe UI', 'Arial Hebrew', 'Noto Sans Hebrew', Arial, sans-serif` — these are bundled with Chromium (which Playwright uses), so no external font installation is needed.
+- **Code stays LTR:** Using `unicode-bidi: bidi-override` on `pre`/`code` forces LTR rendering regardless of document direction. URLs use `unicode-bidi: embed` which is less aggressive but sufficient for inline content.
+- **Line-height adjustment:** Hebrew characters benefit from slightly more vertical space. Normal mode gets 1.8 (vs 1.7 base), compressed mode gets 1.45 (vs 1.35 base) — proportional increase in both cases.
+
+#### Implications
+
+- Adding new RTL languages only requires updating the `isRtlLanguage()` array.
+- If a future language needs a different font stack (e.g., Arabic-specific), `buildRtlStyles` could accept the language code and branch on it. Current implementation uses a shared Semitic/Hebrew font stack.
+- The `originalTitle` field on `ExtractedContent` is set by the translation pipeline (Simba's domain). Rafiki's code only reads it.
+
 ## Governance
 
 - All meaningful changes require team consensus
