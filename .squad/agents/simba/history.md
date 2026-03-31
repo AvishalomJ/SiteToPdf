@@ -29,3 +29,11 @@
 - Playwright `$$eval` runs callbacks in browser context — Node TS doesn't have DOM types. Use `getAttribute()` not property access.
 
 - **2026-03-31:** Tech stack finalized by Mufasa. Playwright chosen for native JS rendering + built-in PDF support. Cheerio for fast extraction. TypeScript enforces contracts between modules.
+
+### 2026-03-31 — URL-based output filenames + progress timer (Simba Sprint)
+
+- **generateOutputFilename(url)** now derives filenames from hostname + pathname (not page title). Dots, slashes, underscores → hyphens, collapsed and trimmed, capped at 80 chars. E.g. `https://bradygaster.github.io/squad/docs/guide/` → `bradygaster-github-io-squad-docs-guide.pdf`.
+- **Progress timer:** Both `runSingleUrl` and `runCrawl` start a one-shot 10-second `setTimeout`. If the pipeline hasn't completed in 10s, a reassuring `⏳ Still working...` message is printed once. Timer is cleared in a `finally` block so it never fires after completion or on error.
+- Both features live in `src/pipeline.ts`. No changes to `fetcher.ts`, `index.ts`, or type contracts.
+- The old `generateOutputFilename` accepted an optional `title` param and fell back to hostname only. New version always uses hostname + pathname for more predictable, URL-representative filenames.
+- **Orchestration log:** `.squad/orchestration-log/2026-03-31T12-26-simba.md`

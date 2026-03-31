@@ -38,3 +38,10 @@
 **Key paths:** `src/extractor.ts`, `src/pdf-generator.ts`, `src/types.ts` (read-only contracts), `src/pipeline.ts` (orchestration, read-only).
 
 - **2026-03-31:** Tech stack finalized by Mufasa. Cheerio chosen for extraction (fast, lightweight). Playwright's `page.pdf()` for PDF rendering (no separate lib needed).
+
+### 2026-03-31 — Footer page number refinements (Rafiki Sprint)
+
+- Updated `HEADER_FOOTER_BASE_STYLE` font from `8pt "Segoe UI"` to `9px Arial` per user spec — Playwright header/footer templates need explicit inline `font-size` to render.
+- Increased bottom margin from `22mm` to `25mm` in both `generatePdf()` and `generateMultiPagePdf()` to give the "Page X of Y" footer comfortable breathing room.
+- Playwright quirk: `displayHeaderFooter: true` requires both `headerTemplate` and `footerTemplate` to be set, even if one is empty. Our code already handled this correctly.
+- **Orchestration log:** `.squad/orchestration-log/2026-03-31T12-26-rafiki.md`
