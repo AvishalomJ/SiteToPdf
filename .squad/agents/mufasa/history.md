@@ -19,3 +19,11 @@
 - **Ownership:** Simba owns `fetcher.ts`, Rafiki owns `extractor.ts` + `pdf-generator.ts`, Mufasa owns `types.ts` + `pipeline.ts` + `index.ts`
 - **Phase 2 prep:** `PageEntry` type already defined for multi-URL crawling. Fetcher will need `crawlSite()`, pipeline will need `runCrawl()`.
 - **User preference:** AvishalomJ wants clean content only — no menus, nav, metadata in the PDF.
+
+### 2026-03-31 — Phase 2 Wiring: Multi-URL Crawl
+
+- **`pipeline.ts`** — Added `runCrawl()` and `CrawlPipelineOptions`. Flow: `crawlSite()` → map through `extractContent(html, baseUrl)` → `generateMultiPagePdf()`. Failed pages are skipped and reported at the end.
+- **`index.ts`** — Restructured CLI to use Commander subcommands with `{ isDefault: true }` on `fetch`. This avoids parent/child option collision. `site-to-pdf <url>` still works (routes to `fetch`), `site-to-pdf crawl <url>` activates multi-URL mode.
+- **CLI pattern:** Don't mix `.argument()` on the root program with `.command()` subcommands in Commander — use `{ isDefault: true }` on a named subcommand instead. Otherwise parent options shadow subcommand options.
+- **Key files:** `src/pipeline.ts` (runCrawl), `src/index.ts` (crawl subcommand)
+- **Crawl options:** `--depth N`, `--max-pages N`, `--delay Ms`, `--format A4|Letter`, `-o output.pdf`
