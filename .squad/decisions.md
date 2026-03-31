@@ -62,6 +62,45 @@ When we add multi-URL crawling:
 - The `PageEntry` type in `types.ts` is already defined for this
 - Simba will need to handle cycle detection, URL normalization, and depth limits
 
+### Retry and Error Classification Strategy
+
+**Author:** Simba  
+**Date:** 2026-03-31  
+**Status:** Implemented
+
+#### Context
+The fetcher needs to handle transient failures gracefully on the real internet.
+
+#### Decision
+- **5xx responses** are treated as transient and retried (up to 3 attempts).
+- **4xx responses** are treated as permanent and returned immediately (no retry).
+- **Empty pages** are retried (some sites return blank on first load).
+- **Timeouts and network errors** are retried with exponential backoff (1s → 2s → 4s).
+- Errors are classified into kinds (`network`, `timeout`, `http`, `empty-page`, `unknown`) via `FetchError` so the pipeline can make informed decisions about how to handle them.
+
+#### Rationale
+Retrying 4xx would waste time on genuinely missing pages. 5xx and empty pages are commonly transient. Exponential backoff avoids hammering struggling servers.
+
+### Content Detection Strategy
+
+**Author:** Rafiki  
+**Date:** 2026-03-31  
+**Status:** Implemented
+
+#### Context
+Real-world websites don't reliably use `<main>` or `<article>` tags. A single CSS selector isn't enough.
+
+#### Decision
+The extractor uses a **3-strategy cascade**:
+
+1. **Known selectors** — Try `main`, `[role="main"]`, `article`, `#content`, `.entry-content`, etc. in priority order. Pick the match with the most text content (handles pages with multiple `<article>` elements).
+2. **Scoring heuristic** — If no known selector matches with 100+ chars, score all `div`/`section` elements using: text length, paragraph count, heading count, link-density penalty, and class/id keyword bonuses. Highest score wins.
+3. **Fallback** — Use `<body>` if nothing scores above threshold.
+
+#### Implications
+- The scoring approach handles most real-world sites but may misfire on single-page apps where content is deeply nested in anonymous divs. Phase 2 crawling (with Playwright-rendered HTML) should mitigate this.
+- The `baseUrl` parameter for `extractContent()` is optional and backward-compatible. Pipeline should pass `fetchResult.url` when available for best results with relative URLs.
+
 ## Governance
 
 - All meaningful changes require team consensus
