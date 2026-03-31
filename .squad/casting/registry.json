@@ -1,0 +1,25 @@
+{
+  "agents": {
+    "mufasa": {
+      "persistent_name": "Mufasa",
+      "universe": "The Lion King",
+      "created_at": "2026-03-31T07:25:16.080Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "simba": {
+      "persistent_name": "Simba",
+      "universe": "The Lion King",
+      "created_at": "2026-03-31T07:25:16.080Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "rafiki": {
+      "persistent_name": "Rafiki",
+      "universe": "The Lion King",
+      "created_at": "2026-03-31T07:25:16.080Z",
+      "legacy_named": false,
+      "status": "active"
+    }
+  }
+}
