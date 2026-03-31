@@ -45,3 +45,34 @@
 - Increased bottom margin from `22mm` to `25mm` in both `generatePdf()` and `generateMultiPagePdf()` to give the "Page X of Y" footer comfortable breathing room.
 - Playwright quirk: `displayHeaderFooter: true` requires both `headerTemplate` and `footerTemplate` to be set, even if one is empty. Our code already handled this correctly.
 - **Orchestration log:** `.squad/orchestration-log/2026-03-31T12-26-rafiki.md`
+
+### 2026-03-31 — Compress mode implementation
+
+**Context:** Added optional `compress` mode to the PDF generator to fit more content per page when enabled. Simba is updating `PdfOptions` interface to include `compress?: boolean`.
+
+**Implementation:**
+- Created `COMPRESSED_STYLES` constant with dense layout values:
+  - Body: 9pt font (was 11pt), 1.35 line-height (was 1.7)
+  - Code blocks: 8pt (was 9pt), padding 8px 10px (was 14px 16px)
+  - Headings: h1 17pt (was 22pt), h2 14pt (was 17pt), h3 12pt (was 14pt), h4+ 10pt (was 12pt)
+  - Line heights: 1.15 for headings (was 1.3), 1.35 for body (was 1.7)
+  - Spacing: paragraphs 0.4em (was 0.8em), heading margins ~60% of original
+  - Tables/blockquotes: 8.5pt (was 10pt for tables)
+- Updated `wrapInHtmlDocument()` and `wrapMultiPageDocument()` to accept optional `compress` parameter
+- Modified `buildHeaderTemplate()` and `buildFooterTemplate()` to use 8px font when compressed (was 10px)
+- Updated `generatePdf()` and `generateMultiPagePdf()` to:
+  - Read `options.compress` (defaults to false)
+  - Pass compress flag to wrapper functions
+  - Use smaller margins when compressed: 15mm top/bottom, 12mm left/right (was 25mm/18mm)
+- Default behavior unchanged when `compress` is false or undefined — backward compatible
+
+**Key decision:** Compress mode is additive. Existing PDFs continue to use spacious, readable layout unless explicitly opted in.
+
+### 2026-03-31 — Compress feature complete (Team: Simba + Rafiki)
+
+- **Simba outcome:** CLI flag wired end-to-end through index.ts → pipeline.ts → types.ts ✓
+- **Rafiki outcome:** COMPRESSED_STYLES implemented in pdf-generator.ts (smaller fonts, reduced margins/spacing) ✓
+- **Integration:** Full pipeline from user input to compressed PDF output verified
+- **Backward compatible:** Feature is opt-in; existing behavior unchanged when flag omitted
+- **Orchestration logs:** `.squad/orchestration-log/2026-03-31T1253-{simba,rafiki}.md`
+- **Session log:** `.squad/log/2026-03-31T1253-compress-feature.md`

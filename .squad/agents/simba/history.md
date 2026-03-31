@@ -37,3 +37,20 @@
 - Both features live in `src/pipeline.ts`. No changes to `fetcher.ts`, `index.ts`, or type contracts.
 - The old `generateOutputFilename` accepted an optional `title` param and fell back to hostname only. New version always uses hostname + pathname for more predictable, URL-representative filenames.
 - **Orchestration log:** `.squad/orchestration-log/2026-03-31T12-26-simba.md`
+
+### 2026-03-31 — Added `--compress` flag wiring
+
+- Added `compress?: boolean` to `PdfOptions` interface in `src/types.ts` — ensures the flag can pass through the entire pipeline to Rafiki's PDF generator.
+- Added `--compress` CLI option to both `fetch` and `crawl` commands in `src/index.ts` — users can now enable compressed layout with a simple flag.
+- Added `compress?: boolean` to both `PipelineOptions` and `CrawlPipelineOptions` in `src/pipeline.ts` — passes the compress value through to the `PdfOptions` object that gets sent to `generatePdf()` and `generateMultiPagePdf()`.
+- This is pure wiring work — no business logic. The actual PDF compression implementation lives in Rafiki's `pdf-generator.ts`.
+- Flag is optional (boolean), defaults to undefined (falsy) when not provided, maintaining backward compatibility.
+
+### 2026-03-31 — Compress feature complete (Team: Simba + Rafiki)
+
+- **Simba outcome:** CLI flag wired end-to-end through index.ts → pipeline.ts → types.ts ✓
+- **Rafiki outcome:** COMPRESSED_STYLES implemented in pdf-generator.ts (smaller fonts, reduced margins/spacing) ✓
+- **Integration:** Full pipeline from user input to compressed PDF output verified
+- **Backward compatible:** Feature is opt-in; existing behavior unchanged when flag omitted
+- **Orchestration logs:** `.squad/orchestration-log/2026-03-31T1253-{simba,rafiki}.md`
+- **Session log:** `.squad/log/2026-03-31T1253-compress-feature.md`
