@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>SiteToPdf</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <h1 class="app-title">
+          <svg class="app-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          SiteToPdf
+        </h1>
+        <p class="app-subtitle">Convert web pages to clean PDFs</p>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <form id="convertForm" class="form-card">
+        
+        <!-- Mode Selector -->
+        <div class="section">
+          <label class="section-label">Conversion Mode</label>
+          <div class="mode-selector">
+            <button type="button" class="mode-btn active" data-mode="single">Single URL</button>
+            <button type="button" class="mode-btn" data-mode="crawl">Crawl Site</button>
+            <button type="button" class="mode-btn" data-mode="list">URL List</button>
+          </div>
+        </div>
+
+        <!-- URL Input -->
+        <div class="section" id="singleUrlSection">
+          <label for="urlInput" class="section-label">URL</label>
+          <input 
+            type="url" 
+            id="urlInput" 
+            class="input-field" 
+            placeholder="https://example.com"
+            required
+          />
+        </div>
+
+        <!-- URL List Input (hidden by default) -->
+        <div class="section hidden" id="urlListSection">
+          <label for="urlListInput" class="section-label">URLs (one per line)</label>
+          <textarea 
+            id="urlListInput" 
+            class="textarea-field" 
+            rows="6"
+            placeholder="https://example.com/page1&#10;https://example.com/page2&#10;https://example.com/page3"
+          ></textarea>
+        </div>
+
+        <!-- Options Panel -->
+        <div class="section">
+          <label class="section-label">Options</label>
+          <div class="options-grid">
+            
+            <!-- Page Format -->
+            <div class="option-group">
+              <label for="formatSelect" class="option-label">Page Format</label>
+              <select id="formatSelect" class="select-field">
+                <option value="A4">A4</option>
+                <option value="Letter">Letter</option>
+              </select>
+            </div>
+
+            <!-- Compress -->
+            <div class="option-group">
+              <label for="compressToggle" class="option-label">Compress PDF</label>
+              <label class="toggle-switch">
+                <input type="checkbox" id="compressToggle">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <!-- Translate -->
+            <div class="option-group">
+              <label for="translateSelect" class="option-label">Translate To</label>
+              <select id="translateSelect" class="select-field">
+                <option value="">None</option>
+                <option value="he">Hebrew</option>
+                <option value="ar">Arabic</option>
+                <option value="es">Spanish</option>
+                <option value="fr">French</option>
+                <option value="de">German</option>
+                <option value="it">Italian</option>
+                <option value="pt">Portuguese</option>
+                <option value="ru">Russian</option>
+                <option value="zh">Chinese</option>
+                <option value="ja">Japanese</option>
+                <option value="ko">Korean</option>
+              </select>
+            </div>
+
+            <!-- Output Path -->
+            <div class="option-group full-width">
+              <label for="outputPath" class="option-label">Output Path</label>
+              <div class="path-input-group">
+                <input type="text" id="outputPath" class="input-field" placeholder="(Auto-generated)">
+                <button type="button" id="browseBtn" class="btn-secondary">Browse</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Crawl Options (hidden by default) -->
+        <div class="section hidden" id="crawlOptionsSection">
+          <label class="section-label">Crawl Options</label>
+          <div class="options-grid">
+            
+            <div class="option-group">
+              <label for="maxDepth" class="option-label">Max Depth</label>
+              <input type="number" id="maxDepth" class="input-field" value="3" min="1" max="10">
+            </div>
+
+            <div class="option-group">
+              <label for="maxPages" class="option-label">Max Pages</label>
+              <input type="number" id="maxPages" class="input-field" value="50" min="1" max="500">
+            </div>
+
+            <div class="option-group">
+              <label for="crawlDelay" class="option-label">Delay (ms)</label>
+              <input type="number" id="crawlDelay" class="input-field" value="500" min="0" max="5000" step="100">
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Convert Button -->
+        <div class="section">
+          <button type="submit" id="convertBtn" class="btn-primary">
+            <span class="btn-text">Convert to PDF</span>
+            <svg class="btn-spinner hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+            </svg>
+          </button>
+        </div>
+
+      </form>
+
+      <!-- Progress Area -->
+      <div class="progress-card" id="progressCard">
+        <div class="progress-header">
+          <h3 class="progress-title">Progress</h3>
+          <button type="button" id="clearLogBtn" class="btn-text-only">Clear</button>
+        </div>
+        <div class="progress-log" id="progressLog">
+          <div class="log-entry log-info">Ready to convert...</div>
+        </div>
+      </div>
+
+      <!-- Result Area -->
+      <div class="result-card hidden" id="resultCard">
+        <div class="result-content" id="resultContent"></div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

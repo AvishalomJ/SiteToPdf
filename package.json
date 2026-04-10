@@ -2,7 +2,7 @@
   "name": "site-to-pdf",
   "version": "0.1.0",
   "description": "CLI tool that fetches a URL, extracts page content, and generates a PDF",
-  "main": "dist/index.js",
+  "main": "electron/main.js",
   "bin": {
     "site-to-pdf": "dist/index.js"
   },
@@ -11,7 +11,11 @@
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
     "lint": "eslint src/",
-    "test": "jest"
+    "test": "jest",
+    "electron": "npm run build && electron .",
+    "electron:dev": "npm run build && electron . --dev",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
   },
   "keywords": [
     "pdf",
@@ -28,7 +32,29 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "electron": "^41.2.0",
+    "electron-builder": "^26.8.1",
     "ts-node": "^10.9.0",
     "typescript": "^5.7.0"
+  },
+  "build": {
+    "appId": "com.sitetopdf.app",
+    "productName": "SiteToPdf",
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "node_modules/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": ["nsis"],
+      "icon": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }
