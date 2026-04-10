@@ -1,0 +1,8 @@
+docs: Log Simba's auto-updater and default folder work
+
+- Added orchestration log for Simba's electron-updater integration
+- Added session log for auto-update and default PDF output folder
+- Merged inbox decisions into decisions.md (electron-updater strategy + default directory approach)
+- Deduped decision records
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

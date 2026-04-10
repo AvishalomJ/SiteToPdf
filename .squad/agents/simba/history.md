@@ -103,3 +103,21 @@
   - UI state management: idle → converting → complete/error with proper button disabling
 - **Cross-platform:** Electron provides Windows/Mac/Linux support with same codebase. Playwright browsers run in detached processes managed by main process lifecycle.
 
+### Auto-Updater + Default Output Directory (Simba Sprint)
+
+- **Auto-updater:** Added `electron-updater` (production dependency) for GitHub Releases-based auto-update.
+  - `setupAutoUpdater()` in `main.js` checks for updates on app start, auto-downloads, and forwards `update-available` / `update-downloaded` events to renderer via IPC.
+  - Renderer shows a dismissable notification bar: blue while downloading, green when ready to install with "Restart & Update" button.
+  - `install-update` IPC handler calls `autoUpdater.quitAndInstall()` to apply the update.
+  - Errors are silently logged — never interrupts user workflow. Offline/no-release scenarios handled gracefully.
+- **electron-builder publish config:** Added `"publish": [{"provider": "github", "owner": "AvishalomJ", "repo": "SiteToPdf"}]` to `build` section in `package.json`. `electron-builder` will now upload release artifacts to GitHub Releases on `npm run dist`.
+- **About dialog:** Now uses `app.getVersion()` instead of hardcoded "Version 0.1.0".
+- **Default output directory:** `Documents/SiteToPdf` created at app startup via `ensureDefaultOutputDir()`.
+  - `get:defaultOutputDir` IPC handler returns the path to renderer.
+  - `withDefaultOutputDir()` wrapper in convert handlers temporarily changes CWD to default dir when no output path is specified — safe because conversions are serialized via `isConverting` flag.
+  - `dialog:save` defaults to `Documents/SiteToPdf/<filename>` instead of bare filenames.
+  - Renderer fetches default dir on load and sets it as placeholder text. Browse dialog starts in default dir.
+  - Backward compatible — if user specifies a custom path, it's used as-is.
+- **Preload bridge additions:** `getDefaultOutputDir()`, `installUpdate()`, `onUpdateAvailable()`, `onUpdateDownloaded()` exposed via `contextBridge`.
+- **UI additions:** Update notification bar (`#updateBar`) in index.html with CSS styling for downloading/ready states. Output path placeholder shows actual default directory path.
+
