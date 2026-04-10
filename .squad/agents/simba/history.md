@@ -69,3 +69,37 @@
 - **Decision:** `.squad/decisions/inbox/simba-translate-feature.md` → merged to `.squad/decisions.md`
 - **Orchestration log:** `.squad/orchestration-log/2026-03-31T1305-simba.md`
 
+### 2026-04-XX — Electron Desktop Application (Simba Sprint)
+
+- **New directory structure:** `electron/` with `main.js` (main process), `preload.js` (secure bridge), and `renderer/` (UI files).
+- **Main process architecture:**
+  - Creates BrowserWindow (1100×750, min 800×600) with contextIsolation and nodeIntegration:false for security
+  - IPC handlers for `convert:single`, `convert:crawl`, `convert:list` → invoke pipeline functions from `dist/pipeline.js`
+  - **Console log interception:** Monkey-patches `console.log/warn/error` during conversion to forward all pipeline progress messages to renderer via `webContents.send('progress', msg)`. Restores console in finally block.
+  - **Browser cleanup:** Calls `shutdown()` after each conversion and on app quit to prevent zombie Playwright processes
+  - Dialog handlers for save path selection, opening PDF, and opening containing folder
+  - App menu with File > Quit and Help > About
+- **Preload script:** Uses `contextBridge.exposeInMainWorld` to securely expose IPC API to renderer: `convertSingle`, `convertCrawl`, `convertList`, `chooseSavePath`, `openFile`, `openFolder`, `onProgress`, `onError`, `onComplete`
+- **UI (renderer/):**
+  - Modern card-based layout with gradient header, dark mode support via `prefers-color-scheme`
+  - Three conversion modes: Single URL, Crawl Site, URL List (dynamic form sections)
+  - Options panel: page format (A4/Letter), compress toggle, translate dropdown, output path with browse button
+  - Crawl-specific options: max depth, max pages, delay between requests
+  - Real-time progress log area (scrollable, color-coded: info/success/warning/error, timestamped)
+  - Result card with success/error display and action buttons (Open PDF, Open Folder)
+  - Clean separation: `index.html` (structure), `styles.css` (modern responsive styling), `app.js` (frontend logic)
+- **Package.json updates:**
+  - Changed `main` to `electron/main.js` for Electron entry point (kept `bin` for CLI usage)
+  - Added scripts: `electron`, `electron:dev`, `pack`, `dist`
+  - Added electron-builder configuration: appId, productName, Windows NSIS installer setup, output to `release/` folder
+  - Dependencies: `electron` and `electron-builder` installed as devDependencies
+- **.gitignore:** Added `release/` to ignore electron-builder output
+- **Build verification:** `npm run build` runs successfully, TypeScript compiles to dist/
+- **Decision doc:** `.squad/decisions/inbox/simba-electron-app.md` documents architecture choices, IPC patterns, security model, and rationale for choosing Electron over alternatives (Tauri, native, web-based)
+- **Key patterns:**
+  - Progress forwarding via console interception is critical — pipeline uses `console.log`, must be intercepted in main process
+  - IPC uses `ipcMain.handle()` (supports async) not `ipcMain.on()`
+  - Error handling guarantees browser cleanup even on failures
+  - UI state management: idle → converting → complete/error with proper button disabling
+- **Cross-platform:** Electron provides Windows/Mac/Linux support with same codebase. Playwright browsers run in detached processes managed by main process lifecycle.
+
