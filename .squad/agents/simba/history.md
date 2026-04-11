@@ -121,3 +121,17 @@
 - **Preload bridge additions:** `getDefaultOutputDir()`, `installUpdate()`, `onUpdateAvailable()`, `onUpdateDownloaded()` exposed via `contextBridge`.
 - **UI additions:** Update notification bar (`#updateBar`) in index.html with CSS styling for downloading/ready states. Output path placeholder shows actual default directory path.
 
+### Gemini AI Summarization — Replace Translation Feature (Simba Sprint)
+
+- **Removed:** Ollama-based translation feature — `translateSelect` from UI, `translate` option from crawlOptions in `main.js`, `translateSelect.value` from `commonOptions` in `app.js`.
+- **Added Gemini API integration:** `callGeminiApi()` in `electron/main.js` uses Node.js `https` module to call `generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`. No extra dependencies.
+- **IPC handler `summarize:content`:** Accepts `{ url, language }`, fetches page via existing `fetchUrl()` + `extractContent()`, sends text to Gemini, returns `{ success, summary, title }`. Content truncated to 30k chars for API limits.
+- **Settings IPC handlers:** `settings:get-api-key` (returns masked key), `settings:set-api-key`, `settings:clear-api-key`. Key stored in `app.getPath('userData')/settings.json` — outside repo, local only.
+- **Security:** API key never logged in full, never exposed to renderer, never committed. Gemini calls happen in main process only (CSP compliant). Key masked as `xxxx...xxxx` in UI.
+- **New UI mode:** 4th mode button "Summarize" added to mode selector. Shows URL input + language dropdown (12 languages). Summary result displayed in styled `.summary-card` with left border accent.
+- **Settings modal:** Gear icon button in header opens modal for API key management. Shows masked current key, save/clear buttons, link to Google AI Studio for key generation.
+- **Preload additions:** `summarizeContent()`, `getApiKey()`, `setApiKey()`, `clearApiKey()` exposed via `contextBridge`.
+- **CSS additions:** Settings button, modal overlay/card, settings form elements, summary card styles — all theme-aware (dark/light).
+- **Key pattern:** `NO_API_KEY` error sentinel allows renderer to show friendly "configure your key" message instead of generic error.
+- **Playwright cleanup:** Summarize handler uses `pipeline.js` `shutdown()` (not fetcher.js) for proper browser cleanup.
+

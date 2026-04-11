@@ -307,13 +307,19 @@ ipcMain.handle('check-for-update', async () => {
   try {
     const result = await autoUpdater.checkForUpdatesAndNotify();
     if (result && result.updateInfo && result.updateInfo.version) {
+      const currentVersion = app.getVersion();
+      if (result.updateInfo.version === currentVersion) {
+        return { status: 'up-to-date', message: `You're on the latest version (v${currentVersion})` };
+      }
       return { status: 'available', version: result.updateInfo.version };
     }
-    return { status: 'up-to-date', message: "You're up to date!" };
+    return { status: 'up-to-date', message: `You're on v${app.getVersion()} — no newer release found.` };
   } catch (error) {
-    // "Latest version" errors mean no update is available
-    if (error.message && error.message.includes('No published versions')) {
-      return { status: 'up-to-date', message: "You're up to date!" };
+    if (error.message && (error.message.includes('No published versions') || error.message.includes('HttpError') || error.message.includes('404'))) {
+      return { status: 'no-releases', message: `No releases published yet. Current: v${app.getVersion()}` };
+    }
+    if (error.message && error.message.includes('net::')) {
+      return { status: 'error', message: 'Network error — check your internet connection.' };
     }
     return { status: 'error', message: error.message || 'Failed to check for updates' };
   }

@@ -420,13 +420,21 @@ async function performUpdateCheck() {
       checkUpdateBtn.classList.remove('checking');
       checkUpdateBtn.classList.add('update-found');
     } else if (result.status === 'up-to-date') {
-      checkUpdateLabel.textContent = "You're up to date!";
+      checkUpdateLabel.textContent = result.message || "You're up to date!";
       checkUpdateBtn.classList.remove('checking');
       setTimeout(() => {
         checkUpdateLabel.textContent = 'Check for Update';
         checkUpdateBtn.disabled = false;
         checkUpdateBtn.classList.remove('update-found');
       }, 3000);
+      return;
+    } else if (result.status === 'no-releases') {
+      checkUpdateLabel.textContent = result.message || 'No releases yet';
+      checkUpdateBtn.classList.remove('checking');
+      setTimeout(() => {
+        checkUpdateLabel.textContent = 'Check for Update';
+        checkUpdateBtn.disabled = false;
+      }, 4000);
       return;
     } else {
       checkUpdateLabel.textContent = result.message || 'Check failed';
