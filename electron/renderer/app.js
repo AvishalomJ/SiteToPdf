@@ -172,6 +172,9 @@ form.addEventListener('submit', async (e) => {
   
   setConverting(true);
   addLogEntry('Starting conversion...', 'info');
+
+  // Auto-scroll to progress section
+  document.getElementById('progressCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
   
   try {
     const commonOptions = {
@@ -227,6 +230,9 @@ async function handleSummarize() {
 
   setConverting(true);
   addLogEntry('Starting summarization...', 'info');
+
+  // Auto-scroll to progress section
+  document.getElementById('progressCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   try {
     const language = summaryLangSelect.value;
