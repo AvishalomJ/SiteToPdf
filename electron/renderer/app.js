@@ -15,6 +15,8 @@ const formatSelect = document.getElementById('formatSelect');
 const compressToggle = document.getElementById('compressToggle');
 const summaryLangGroup = document.getElementById('summaryLangGroup');
 const summaryLangSelect = document.getElementById('summaryLangSelect');
+const summaryModelGroup = document.getElementById('summaryModelGroup');
+const summaryModelSelect = document.getElementById('summaryModelSelect');
 const outputPath = document.getElementById('outputPath');
 const browseBtn = document.getElementById('browseBtn');
 const maxDepth = document.getElementById('maxDepth');
@@ -67,6 +69,7 @@ function updateVisibleSections() {
   urlListSection.classList.add('hidden');
   crawlOptionsSection.classList.add('hidden');
   summaryLangGroup.classList.add('hidden');
+  summaryModelGroup.classList.add('hidden');
   urlInput.required = false;
   urlListInput.required = false;
 
@@ -86,6 +89,7 @@ function updateVisibleSections() {
   } else if (currentMode === 'summarize') {
     singleUrlSection.classList.remove('hidden');
     summaryLangGroup.classList.remove('hidden');
+    summaryModelGroup.classList.remove('hidden');
     urlInput.required = true;
     btnText.textContent = 'Summarize';
   }
@@ -236,7 +240,8 @@ async function handleSummarize() {
 
   try {
     const language = summaryLangSelect.value;
-    const result = await window.siteToPdf.summarizeContent({ url, language });
+    const model = summaryModelSelect.value;
+    const result = await window.siteToPdf.summarizeContent({ url, language, model });
 
     if (result.success) {
       showSummary(result.title, result.summary);
@@ -392,13 +397,24 @@ async function loadModelSetting() {
   try {
     const model = await window.siteToPdf.getModel();
     geminiModelSelect.value = model;
+    summaryModelSelect.value = model;
   } catch {}
 }
 
 geminiModelSelect.addEventListener('change', async () => {
   try {
     await window.siteToPdf.setModel(geminiModelSelect.value);
+    summaryModelSelect.value = geminiModelSelect.value;
     addLogEntry(`Gemini model set to ${geminiModelSelect.value}`, 'info');
+  } catch (error) {
+    addLogEntry(`Failed to save model: ${error.message}`, 'error');
+  }
+});
+
+summaryModelSelect.addEventListener('change', async () => {
+  try {
+    await window.siteToPdf.setModel(summaryModelSelect.value);
+    geminiModelSelect.value = summaryModelSelect.value;
   } catch (error) {
     addLogEntry(`Failed to save model: ${error.message}`, 'error');
   }
@@ -600,3 +616,4 @@ async function initDefaultOutputDir() {
 // Initialize
 updateVisibleSections();
 initDefaultOutputDir();
+loadModelSetting();

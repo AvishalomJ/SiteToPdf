@@ -538,7 +538,7 @@ ipcMain.handle('settings:set-model', async (_event, model) => {
   return { success: true };
 });
 
-ipcMain.handle('summarize:content', async (event, { url, language }) => {
+ipcMain.handle('summarize:content', async (event, { url, language, model: requestModel }) => {
   const win = BrowserWindow.fromWebContents(event.sender);
 
   // Check for API key
@@ -548,7 +548,7 @@ ipcMain.handle('summarize:content', async (event, { url, language }) => {
     throw new Error('NO_API_KEY');
   }
 
-  const model = settings.geminiModel || 'gemini-2.0-flash';
+  const model = requestModel || settings.geminiModel || 'gemini-2.0-flash';
   const modelLabel = GEMINI_MODELS[model] || model;
 
   const sendProgress = (msg) => {

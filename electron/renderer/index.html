@@ -134,6 +134,16 @@
               </select>
             </div>
 
+            <!-- Gemini Model (visible in Summarize mode only) -->
+            <div class="option-group hidden" id="summaryModelGroup">
+              <label for="summaryModelSelect" class="option-label">Gemini Model</label>
+              <select id="summaryModelSelect" class="select-field">
+                <option value="gemini-2.0-flash">2.0 Flash (fast, latest)</option>
+                <option value="gemini-1.5-flash">1.5 Flash (fast, stable)</option>
+                <option value="gemini-1.5-pro">1.5 Pro (higher quality)</option>
+              </select>
+            </div>
+
             <!-- Output Path -->
             <div class="option-group full-width">
               <label for="outputPath" class="option-label">Output Path</label>
