@@ -440,12 +440,12 @@ ipcMain.handle('settings:clear-api-key', async () => {
 // --- Gemini Summarization ---
 
 const GEMINI_MODELS = {
+  'gemini-2.5-flash': 'Gemini 2.5 Flash',
+  'gemini-2.5-pro': 'Gemini 2.5 Pro',
   'gemini-2.0-flash': 'Gemini 2.0 Flash',
-  'gemini-1.5-flash': 'Gemini 1.5 Flash',
-  'gemini-1.5-pro': 'Gemini 1.5 Pro',
 };
 
-function callGeminiApi(apiKey, prompt, model = 'gemini-2.0-flash') {
+function callGeminiApi(apiKey, prompt, model = 'gemini-2.5-flash') {
   return new Promise((resolve, reject) => {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     const body = JSON.stringify({
@@ -528,7 +528,7 @@ async function callGeminiWithRetry(apiKey, prompt, model, sendProgress, maxRetri
 
 ipcMain.handle('settings:get-model', async () => {
   const settings = readSettings();
-  return settings.geminiModel || 'gemini-2.0-flash';
+  return settings.geminiModel || 'gemini-2.5-flash';
 });
 
 ipcMain.handle('settings:set-model', async (_event, model) => {
@@ -548,7 +548,7 @@ ipcMain.handle('summarize:content', async (event, { url, language, model: reques
     throw new Error('NO_API_KEY');
   }
 
-  const model = requestModel || settings.geminiModel || 'gemini-2.0-flash';
+  const model = requestModel || settings.geminiModel || 'gemini-2.5-flash';
   const modelLabel = GEMINI_MODELS[model] || model;
 
   const sendProgress = (msg) => {

@@ -107,6 +107,8 @@ browseBtn.addEventListener('click', async () => {
 // Clear log button
 clearLogBtn.addEventListener('click', () => {
   progressLog.innerHTML = '<div class="log-entry log-info">Ready to convert...</div>';
+  resultCard.classList.add('hidden');
+  summaryCard.classList.add('hidden');
 });
 
 // Close summary card
