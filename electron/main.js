@@ -86,6 +86,15 @@ function createWindow() {
       label: 'Help',
       submenu: [
         {
+          label: 'Check for Updates...',
+          click: () => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('trigger-check-for-update');
+            }
+          },
+        },
+        { type: 'separator' },
+        {
           label: 'About',
           click: () => {
             dialog.showMessageBox(mainWindow, {
@@ -292,6 +301,22 @@ ipcMain.handle('convert:cancel', async () => {
 
 ipcMain.handle('get:defaultOutputDir', async () => {
   return ensureDefaultOutputDir();
+});
+
+ipcMain.handle('check-for-update', async () => {
+  try {
+    const result = await autoUpdater.checkForUpdatesAndNotify();
+    if (result && result.updateInfo && result.updateInfo.version) {
+      return { status: 'available', version: result.updateInfo.version };
+    }
+    return { status: 'up-to-date', message: "You're up to date!" };
+  } catch (error) {
+    // "Latest version" errors mean no update is available
+    if (error.message && error.message.includes('No published versions')) {
+      return { status: 'up-to-date', message: "You're up to date!" };
+    }
+    return { status: 'error', message: error.message || 'Failed to check for updates' };
+  }
 });
 
 ipcMain.handle('install-update', async () => {

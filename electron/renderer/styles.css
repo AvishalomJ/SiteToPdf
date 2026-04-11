@@ -68,6 +68,46 @@ body {
 .header-content {
   max-width: 1200px;
   margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Check for Update Button */
+.check-update-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  background: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.check-update-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.check-update-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.check-update-btn.checking svg {
+  animation: spin 1s linear infinite;
+}
+
+.check-update-btn.update-found {
+  background: rgba(16, 185, 129, 0.3);
+  border-color: rgba(16, 185, 129, 0.5);
 }
 
 .app-title {
@@ -452,6 +492,59 @@ input:checked + .toggle-slider:before {
 .result-actions button:nth-child(2):hover {
   background: var(--color-card);
   border-color: var(--color-primary);
+}
+
+/* Update Notification Bar */
+.update-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 2rem;
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 500;
+  box-shadow: var(--shadow-sm);
+}
+
+.update-bar.downloading {
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+}
+
+.update-message {
+  flex: 1;
+}
+
+.update-action-btn {
+  padding: 0.4rem 1rem;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.update-action-btn:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.update-dismiss-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0 0.25rem;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.update-dismiss-btn:hover {
+  color: white;
 }
 
 /* Utility Classes */

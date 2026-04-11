@@ -12,6 +12,7 @@
     <!-- Header -->
     <header class="header">
       <div class="header-content">
+      <div class="header-title-group">
         <h1 class="app-title">
           <svg class="app-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -24,7 +25,22 @@
         </h1>
         <p class="app-subtitle">Convert web pages to clean PDFs</p>
       </div>
+      <button id="checkUpdateBtn" class="check-update-btn" title="Check for updates">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="1 4 1 10 7 10"></polyline>
+          <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+        </svg>
+        <span id="checkUpdateLabel">Check for Update</span>
+      </button>
+    </div>
     </header>
+
+    <!-- Update Notification -->
+    <div id="updateBar" class="update-bar hidden">
+      <span id="updateMessage" class="update-message"></span>
+      <button id="updateAction" class="update-action-btn hidden">Restart &amp; Update</button>
+      <button id="updateDismiss" class="update-dismiss-btn" aria-label="Dismiss">&times;</button>
+    </div>
 
     <!-- Main Content -->
     <main class="main-content">
@@ -109,7 +125,7 @@
             <div class="option-group full-width">
               <label for="outputPath" class="option-label">Output Path</label>
               <div class="path-input-group">
-                <input type="text" id="outputPath" class="input-field" placeholder="(Auto-generated)">
+                <input type="text" id="outputPath" class="input-field" placeholder="Default: Documents/SiteToPdf">
                 <button type="button" id="browseBtn" class="btn-secondary">Browse</button>
               </div>
             </div>

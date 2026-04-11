@@ -1,6 +1,7 @@
 // State
 let currentMode = 'single';
 let isConverting = false;
+let defaultOutputDir = '';
 
 // Elements
 const form = document.getElementById('convertForm');
@@ -25,6 +26,10 @@ const progressLog = document.getElementById('progressLog');
 const clearLogBtn = document.getElementById('clearLogBtn');
 const resultCard = document.getElementById('resultCard');
 const resultContent = document.getElementById('resultContent');
+const updateBar = document.getElementById('updateBar');
+const updateMessage = document.getElementById('updateMessage');
+const updateAction = document.getElementById('updateAction');
+const updateDismiss = document.getElementById('updateDismiss');
 
 // Mode switching
 modeButtons.forEach(btn => {
@@ -66,9 +71,9 @@ function updateVisibleSections() {
 // Browse button
 browseBtn.addEventListener('click', async () => {
   const defaultFilename = outputPath.value || 'output.pdf';
-  const path = await window.siteToPdf.chooseSavePath(defaultFilename);
-  if (path) {
-    outputPath.value = path;
+  const filePath = await window.siteToPdf.chooseSavePath(defaultFilename);
+  if (filePath) {
+    outputPath.value = filePath;
   }
 });
 
@@ -226,5 +231,98 @@ function showResult(success, data) {
   }
 }
 
+// Auto-update listeners
+window.siteToPdf.onUpdateAvailable((data) => {
+  updateBar.classList.remove('hidden');
+  updateBar.classList.add('downloading');
+  updateMessage.textContent = `Downloading update v${data.version}...`;
+  updateAction.classList.add('hidden');
+});
+
+window.siteToPdf.onUpdateDownloaded((data) => {
+  updateBar.classList.remove('hidden', 'downloading');
+  updateMessage.textContent = `Update v${data.version} ready to install.`;
+  updateAction.classList.remove('hidden');
+});
+
+updateAction.addEventListener('click', () => {
+  window.siteToPdf.installUpdate();
+});
+
+updateDismiss.addEventListener('click', () => {
+  updateBar.classList.add('hidden');
+});
+
+// Check for Update button
+const checkUpdateBtn = document.getElementById('checkUpdateBtn');
+const checkUpdateLabel = document.getElementById('checkUpdateLabel');
+
+async function performUpdateCheck() {
+  if (checkUpdateBtn.disabled) return;
+  checkUpdateBtn.disabled = true;
+  checkUpdateLabel.textContent = 'Checking...';
+  checkUpdateBtn.classList.add('checking');
+
+  try {
+    const result = await window.siteToPdf.checkForUpdate();
+    if (result.status === 'available') {
+      checkUpdateLabel.textContent = `v${result.version} available!`;
+      checkUpdateBtn.classList.remove('checking');
+      checkUpdateBtn.classList.add('update-found');
+    } else if (result.status === 'up-to-date') {
+      checkUpdateLabel.textContent = "You're up to date!";
+      checkUpdateBtn.classList.remove('checking');
+      setTimeout(() => {
+        checkUpdateLabel.textContent = 'Check for Update';
+        checkUpdateBtn.disabled = false;
+        checkUpdateBtn.classList.remove('update-found');
+      }, 3000);
+      return;
+    } else {
+      checkUpdateLabel.textContent = result.message || 'Check failed';
+      checkUpdateBtn.classList.remove('checking');
+      setTimeout(() => {
+        checkUpdateLabel.textContent = 'Check for Update';
+        checkUpdateBtn.disabled = false;
+      }, 3000);
+      return;
+    }
+  } catch (error) {
+    checkUpdateLabel.textContent = 'Check failed';
+    checkUpdateBtn.classList.remove('checking');
+    setTimeout(() => {
+      checkUpdateLabel.textContent = 'Check for Update';
+      checkUpdateBtn.disabled = false;
+    }, 3000);
+    return;
+  }
+
+  setTimeout(() => {
+    checkUpdateLabel.textContent = 'Check for Update';
+    checkUpdateBtn.disabled = false;
+    checkUpdateBtn.classList.remove('update-found');
+  }, 5000);
+}
+
+checkUpdateBtn.addEventListener('click', performUpdateCheck);
+
+// Listen for menu-triggered update check
+window.siteToPdf.onTriggerCheckForUpdate(() => {
+  performUpdateCheck();
+});
+
+// Load default output directory
+async function initDefaultOutputDir() {
+  try {
+    defaultOutputDir = await window.siteToPdf.getDefaultOutputDir();
+    if (defaultOutputDir && !outputPath.value) {
+      outputPath.placeholder = `Default: ${defaultOutputDir}`;
+    }
+  } catch (err) {
+    // Non-critical — just keep the static placeholder
+  }
+}
+
 // Initialize
 updateVisibleSections();
+initDefaultOutputDir();
