@@ -117,6 +117,26 @@ closeSummaryBtn.addEventListener('click', () => {
 });
 
 // Progress logging
+function playSuccessSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const notes = [523.25, 659.25, 783.99]; // C5, E5, G5 chord
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.1);
+      gain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + i * 0.1 + 0.05);
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + i * 0.1 + 0.5);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.1);
+      osc.stop(ctx.currentTime + i * 0.1 + 0.5);
+    });
+    setTimeout(() => ctx.close(), 1000);
+  } catch {}
+}
+
 function addLogEntry(message, type = 'info') {
   const entry = document.createElement('div');
   entry.className = `log-entry log-${type}`;
@@ -155,6 +175,7 @@ window.siteToPdf.onComplete((data) => {
   const filename = data.outputPath.split(/[\\/]/).pop();
   addLogEntry(`✅ PDF generated successfully: ${filename}`, 'success');
   showResult(true, data.outputPath);
+  playSuccessSound();
   setConverting(false);
 });
 
@@ -247,6 +268,7 @@ async function handleSummarize() {
 
     if (result.success) {
       showSummary(result.title, result.summary);
+      playSuccessSound();
     }
   } catch (error) {
     if (error.message && error.message.includes('NO_API_KEY')) {

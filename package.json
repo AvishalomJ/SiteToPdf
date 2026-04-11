@@ -1,6 +1,6 @@
 {
   "name": "site-to-pdf",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "description": "CLI tool that fetches a URL, extracts page content, and generates a PDF",
   "main": "electron/main.js",
   "bin": {
