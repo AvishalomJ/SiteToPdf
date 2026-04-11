@@ -433,9 +433,15 @@ ipcMain.handle('settings:clear-api-key', async () => {
 
 // --- Gemini Summarization ---
 
-function callGeminiApi(apiKey, prompt) {
+const GEMINI_MODELS = {
+  'gemini-2.0-flash': 'Gemini 2.0 Flash',
+  'gemini-1.5-flash': 'Gemini 1.5 Flash',
+  'gemini-1.5-pro': 'Gemini 1.5 Pro',
+};
+
+function callGeminiApi(apiKey, prompt, model = 'gemini-2.0-flash') {
   return new Promise((resolve, reject) => {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     const body = JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
     });
@@ -458,7 +464,14 @@ function callGeminiApi(apiKey, prompt) {
         try {
           const json = JSON.parse(data);
           if (json.error) {
-            reject(new Error(json.error.message || 'Gemini API error'));
+            const msg = json.error.message || 'Gemini API error';
+            const err = new Error(msg);
+            err.status = json.error.code;
+            err.isQuota = msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate');
+            // Extract retry delay if present
+            const retryMatch = msg.match(/retry in ([\d.]+)s/i);
+            if (retryMatch) err.retryAfter = Math.ceil(parseFloat(retryMatch[1]));
+            reject(err);
             return;
           }
           const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -483,6 +496,42 @@ function callGeminiApi(apiKey, prompt) {
   });
 }
 
+async function callGeminiWithRetry(apiKey, prompt, model, sendProgress, maxRetries = 1) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await callGeminiApi(apiKey, prompt, model);
+    } catch (error) {
+      if (error.isQuota && error.retryAfter && attempt < maxRetries) {
+        const waitSec = Math.min(error.retryAfter + 1, 30);
+        sendProgress(`⏳ Rate limited — retrying in ${waitSec}s...`);
+        await new Promise(r => setTimeout(r, waitSec * 1000));
+        sendProgress(`🔄 Retrying request (attempt ${attempt + 2})...`);
+        continue;
+      }
+      // Friendlier error messages
+      if (error.isQuota) {
+        throw new Error(
+          'QUOTA_EXCEEDED: Your Gemini API quota is exhausted. ' +
+          'Either enable billing at ai.google.dev or try a different model (e.g., Gemini 1.5 Flash).'
+        );
+      }
+      throw error;
+    }
+  }
+}
+
+ipcMain.handle('settings:get-model', async () => {
+  const settings = readSettings();
+  return settings.geminiModel || 'gemini-2.0-flash';
+});
+
+ipcMain.handle('settings:set-model', async (_event, model) => {
+  const settings = readSettings();
+  settings.geminiModel = model;
+  writeSettings(settings);
+  return { success: true };
+});
+
 ipcMain.handle('summarize:content', async (event, { url, language }) => {
   const win = BrowserWindow.fromWebContents(event.sender);
 
@@ -492,6 +541,9 @@ ipcMain.handle('summarize:content', async (event, { url, language }) => {
   if (!apiKey) {
     throw new Error('NO_API_KEY');
   }
+
+  const model = settings.geminiModel || 'gemini-2.0-flash';
+  const modelLabel = GEMINI_MODELS[model] || model;
 
   const sendProgress = (msg) => {
     if (win && !win.isDestroyed()) {
@@ -521,10 +573,10 @@ ipcMain.handle('summarize:content', async (event, { url, language }) => {
       ? contentText.slice(0, 30000) + '\n\n[Content truncated for summarization]'
       : contentText;
 
-    sendProgress(`Sending content to Gemini for summarization in ${language}...`);
+    sendProgress(`Sending to ${modelLabel} for summarization in ${language}...`);
 
     const prompt = `Summarize this web page content in ${language}. Provide a clear, well-structured summary that captures the key points:\n\n${truncated}`;
-    const summary = await callGeminiApi(apiKey, prompt);
+    const summary = await callGeminiWithRetry(apiKey, prompt, model, sendProgress);
 
     sendProgress('✅ Summarization complete!');
     return { success: true, summary, title: extracted.title || url };
@@ -536,7 +588,13 @@ ipcMain.handle('summarize:content', async (event, { url, language }) => {
     } catch {}
 
     if (error.message === 'NO_API_KEY') throw error;
-    sendProgress(`❌ ${error.message}`);
+
+    // Friendlier error display
+    let userMessage = error.message;
+    if (error.message.startsWith('QUOTA_EXCEEDED:')) {
+      userMessage = error.message.replace('QUOTA_EXCEEDED: ', '');
+    }
+    sendProgress(`❌ ${userMessage}`);
     throw error;
   }
 });

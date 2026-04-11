@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('siteToPdf', {
   getApiKey: () => ipcRenderer.invoke('settings:get-api-key'),
   setApiKey: (key) => ipcRenderer.invoke('settings:set-api-key', key),
   clearApiKey: () => ipcRenderer.invoke('settings:clear-api-key'),
+  getModel: () => ipcRenderer.invoke('settings:get-model'),
+  setModel: (model) => ipcRenderer.invoke('settings:set-model', model),
   onTriggerCheckForUpdate: (callback) => {
     const listener = () => callback();
     ipcRenderer.on('trigger-check-for-update', listener);

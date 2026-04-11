@@ -245,6 +245,10 @@ async function handleSummarize() {
     if (error.message && error.message.includes('NO_API_KEY')) {
       addLogEntry('No Gemini API key configured. Please open Settings to add your key.', 'error');
       showResult(false, 'No API key set. Click the ⚙ gear icon in the header to configure your Gemini API key.');
+    } else if (error.message && error.message.includes('QUOTA_EXCEEDED')) {
+      const cleanMsg = error.message.replace('QUOTA_EXCEEDED: ', '');
+      addLogEntry('Gemini API quota exceeded', 'error');
+      showResult(false, '⚠️ ' + cleanMsg);
     } else {
       addLogEntry(`Error: ${error.message}`, 'error');
       showResult(false, error.message);
@@ -316,9 +320,12 @@ function showResult(success, data) {
 }
 
 // --- Settings Modal ---
+const geminiModelSelect = document.getElementById('geminiModelSelect');
+
 settingsBtn.addEventListener('click', async () => {
   settingsModal.classList.remove('hidden');
   await loadApiKeyStatus();
+  await loadModelSetting();
 });
 
 closeSettingsBtn.addEventListener('click', () => {
@@ -378,6 +385,22 @@ clearApiKeyBtn.addEventListener('click', async () => {
     addLogEntry('API key cleared', 'info');
   } catch (error) {
     addLogEntry(`Failed to clear API key: ${error.message}`, 'error');
+  }
+});
+
+async function loadModelSetting() {
+  try {
+    const model = await window.siteToPdf.getModel();
+    geminiModelSelect.value = model;
+  } catch {}
+}
+
+geminiModelSelect.addEventListener('change', async () => {
+  try {
+    await window.siteToPdf.setModel(geminiModelSelect.value);
+    addLogEntry(`Gemini model set to ${geminiModelSelect.value}`, 'info');
+  } catch (error) {
+    addLogEntry(`Failed to save model: ${error.message}`, 'error');
   }
 });
 
