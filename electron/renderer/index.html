@@ -43,9 +43,15 @@
 
     <!-- Update Notification -->
     <div id="updateBar" class="update-bar hidden">
-      <span id="updateMessage" class="update-message"></span>
-      <button id="updateAction" class="update-action-btn hidden">Restart &amp; Update</button>
-      <button id="updateDismiss" class="update-dismiss-btn" aria-label="Dismiss">&times;</button>
+      <div class="update-top-row">
+        <span id="updateMessage" class="update-message"></span>
+        <span id="updatePercent" class="update-percent hidden">0%</span>
+        <button id="updateAction" class="update-action-btn hidden">Restart &amp; Update</button>
+        <button id="updateDismiss" class="update-dismiss-btn" aria-label="Dismiss">&times;</button>
+      </div>
+      <div id="updateProgressContainer" class="update-progress-container hidden">
+        <div id="updateProgressBar" class="update-progress-bar" style="width: 0%"></div>
+      </div>
     </div>
 
     <!-- Main Content -->

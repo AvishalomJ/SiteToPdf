@@ -382,17 +382,43 @@ clearApiKeyBtn.addEventListener('click', async () => {
 });
 
 // Auto-update listeners
+const updatePercent = document.getElementById('updatePercent');
+const updateProgressContainer = document.getElementById('updateProgressContainer');
+const updateProgressBar = document.getElementById('updateProgressBar');
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
 window.siteToPdf.onUpdateAvailable((data) => {
   updateBar.classList.remove('hidden');
   updateBar.classList.add('downloading');
   updateMessage.textContent = `Downloading update v${data.version}...`;
   updateAction.classList.add('hidden');
+  updatePercent.classList.remove('hidden');
+  updatePercent.textContent = '0%';
+  updateProgressContainer.classList.remove('hidden');
+  updateProgressBar.style.width = '0%';
+});
+
+window.siteToPdf.onDownloadProgress((data) => {
+  const pct = data.percent;
+  updateProgressBar.style.width = pct + '%';
+  updatePercent.textContent = pct + '%';
+  const speed = formatBytes(data.bytesPerSecond) + '/s';
+  const transferred = formatBytes(data.transferred);
+  const total = formatBytes(data.total);
+  updateMessage.textContent = `Downloading update — ${transferred} / ${total} (${speed})`;
 });
 
 window.siteToPdf.onUpdateDownloaded((data) => {
   updateBar.classList.remove('hidden', 'downloading');
   updateMessage.textContent = `Update v${data.version} ready to install.`;
   updateAction.classList.remove('hidden');
+  updatePercent.classList.add('hidden');
+  updateProgressContainer.classList.add('hidden');
 });
 
 updateAction.addEventListener('click', () => {
