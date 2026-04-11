@@ -58,8 +58,14 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on('error', (err) => {
-    // Silently log update errors — don't interrupt user workflow
     console.error('Auto-updater error:', err.message);
+    // Reset state so the next check can retry
+    if (updateState.status === 'downloading') {
+      updateState = { status: 'idle', version: null };
+    }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update-error', { message: err.message });
+    }
   });
 
   autoUpdater.checkForUpdatesAndNotify().catch(() => {

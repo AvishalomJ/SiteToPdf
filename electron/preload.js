@@ -54,4 +54,9 @@ contextBridge.exposeInMainWorld('siteToPdf', {
     ipcRenderer.on('download-progress', listener);
     return () => ipcRenderer.removeListener('download-progress', listener);
   },
+  onUpdateError: (callback) => {
+    const listener = (_, data) => callback(data);
+    ipcRenderer.on('update-error', listener);
+    return () => ipcRenderer.removeListener('update-error', listener);
+  },
 });

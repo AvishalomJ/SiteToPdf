@@ -454,6 +454,18 @@ window.siteToPdf.onUpdateDownloaded((data) => {
   showUpdateReady(data.version);
 });
 
+window.siteToPdf.onUpdateError((data) => {
+  // Hide the download bar if it was showing
+  updateBar.classList.add('hidden');
+  updateProgressContainer.classList.add('hidden');
+  updatePercent.classList.add('hidden');
+  // Reset the check button
+  checkUpdateLabel.textContent = 'Check for Update';
+  checkUpdateBtn.disabled = false;
+  checkUpdateBtn.classList.remove('checking', 'update-found', 'update-ready');
+  addLogEntry(`Update error: ${data.message}`, 'error');
+});
+
 updateAction.addEventListener('click', () => {
   window.siteToPdf.installUpdate();
 });
@@ -498,6 +510,19 @@ async function performUpdateCheck() {
       checkUpdateBtn.classList.remove('checking');
       showDownloading(result.version);
       checkUpdateBtn.disabled = false;
+      // Safety: if no progress/downloaded event within 15s, re-check state
+      setTimeout(async () => {
+        if (!pendingUpdateVersion && updateBar.classList.contains('downloading')) {
+          const recheck = await window.siteToPdf.checkForUpdate();
+          if (recheck.status === 'downloaded') {
+            showUpdateReady(recheck.version);
+          } else if (recheck.status === 'up-to-date' || recheck.status === 'error' || recheck.status === 'idle') {
+            updateBar.classList.add('hidden');
+            checkUpdateLabel.textContent = 'Check for Update';
+            checkUpdateBtn.classList.remove('update-found', 'update-ready');
+          }
+        }
+      }, 15000);
       return;
     } else if (result.status === 'available') {
       checkUpdateLabel.textContent = `v${result.version} available!`;
