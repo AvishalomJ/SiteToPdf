@@ -1,8 +1,56 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
+const fs = require('fs');
 
 let mainWindow;
 let isConverting = false;
+
+// Default output directory: Documents/SiteToPdf
+function getDefaultOutputDir() {
+  const docsDir = app.getPath('documents');
+  return path.join(docsDir, 'SiteToPdf');
+}
+
+function ensureDefaultOutputDir() {
+  const dir = getDefaultOutputDir();
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return dir;
+}
+
+// Auto-updater setup
+function setupAutoUpdater() {
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('update-available', (info) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update-available', {
+        version: info.version,
+        releaseNotes: info.releaseNotes,
+      });
+    }
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update-downloaded', {
+        version: info.version,
+      });
+    }
+  });
+
+  autoUpdater.on('error', (err) => {
+    // Silently log update errors — don't interrupt user workflow
+    console.error('Auto-updater error:', err.message);
+  });
+
+  autoUpdater.checkForUpdatesAndNotify().catch(() => {
+    // Ignore check errors (offline, no releases, etc.)
+  });
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -44,7 +92,7 @@ function createWindow() {
               type: 'info',
               title: 'About SiteToPdf',
               message: 'SiteToPdf',
-              detail: 'Convert web pages to clean PDFs\nVersion 0.1.0',
+              detail: `Convert web pages to clean PDFs\nVersion ${app.getVersion()}`,
             });
           },
         },
@@ -93,6 +141,18 @@ function withProgressForwarding(win, fn) {
 }
 
 // IPC Handlers
+
+// Temporarily change CWD to default output dir when no output path is specified
+function withDefaultOutputDir(options, fn) {
+  if (!options.output) {
+    const originalCwd = process.cwd();
+    const defaultDir = ensureDefaultOutputDir();
+    process.chdir(defaultDir);
+    return fn().finally(() => process.chdir(originalCwd));
+  }
+  return fn();
+}
+
 ipcMain.handle('convert:single', async (event, options) => {
   if (isConverting) {
     throw new Error('Conversion already in progress');
@@ -104,16 +164,23 @@ ipcMain.handle('convert:single', async (event, options) => {
   try {
     const { runSingleUrl, shutdown } = require(path.join(__dirname, '..', 'dist', 'pipeline.js'));
 
-    const outputPath = await withProgressForwarding(win, () => runSingleUrl(options));
+    const outputPath = await withDefaultOutputDir(options, () =>
+      withProgressForwarding(win, () => runSingleUrl(options))
+    );
+
+    const resolvedPath = path.isAbsolute(outputPath) ? outputPath : path.join(
+      options.output ? path.dirname(options.output) : getDefaultOutputDir(),
+      outputPath
+    );
 
     await shutdown();
     isConverting = false;
 
     if (win && !win.isDestroyed()) {
-      win.webContents.send('complete', { outputPath });
+      win.webContents.send('complete', { outputPath: resolvedPath });
     }
 
-    return { success: true, outputPath };
+    return { success: true, outputPath: resolvedPath };
   } catch (error) {
     isConverting = false;
     await require(path.join(__dirname, '..', 'dist', 'pipeline.js')).shutdown().catch(() => {});
@@ -149,16 +216,23 @@ ipcMain.handle('convert:crawl', async (event, options) => {
       translate: options.translate,
     };
 
-    const outputPath = await withProgressForwarding(win, () => runCrawl(crawlOptions));
+    const outputPath = await withDefaultOutputDir(crawlOptions, () =>
+      withProgressForwarding(win, () => runCrawl(crawlOptions))
+    );
+
+    const resolvedPath = path.isAbsolute(outputPath) ? outputPath : path.join(
+      crawlOptions.output ? path.dirname(crawlOptions.output) : getDefaultOutputDir(),
+      outputPath
+    );
 
     await shutdown();
     isConverting = false;
 
     if (win && !win.isDestroyed()) {
-      win.webContents.send('complete', { outputPath });
+      win.webContents.send('complete', { outputPath: resolvedPath });
     }
 
-    return { success: true, outputPath };
+    return { success: true, outputPath: resolvedPath };
   } catch (error) {
     isConverting = false;
     await require(path.join(__dirname, '..', 'dist', 'pipeline.js')).shutdown().catch(() => {});
@@ -182,16 +256,23 @@ ipcMain.handle('convert:list', async (event, options) => {
   try {
     const { runList, shutdown } = require(path.join(__dirname, '..', 'dist', 'pipeline.js'));
 
-    const outputPath = await withProgressForwarding(win, () => runList(options));
+    const outputPath = await withDefaultOutputDir(options, () =>
+      withProgressForwarding(win, () => runList(options))
+    );
+
+    const resolvedPath = path.isAbsolute(outputPath) ? outputPath : path.join(
+      options.output ? path.dirname(options.output) : getDefaultOutputDir(),
+      outputPath
+    );
 
     await shutdown();
     isConverting = false;
 
     if (win && !win.isDestroyed()) {
-      win.webContents.send('complete', { outputPath });
+      win.webContents.send('complete', { outputPath: resolvedPath });
     }
 
-    return { success: true, outputPath };
+    return { success: true, outputPath: resolvedPath };
   } catch (error) {
     isConverting = false;
     await require(path.join(__dirname, '..', 'dist', 'pipeline.js')).shutdown().catch(() => {});
@@ -209,11 +290,24 @@ ipcMain.handle('convert:cancel', async () => {
   return { success: false, message: 'Cancellation not yet implemented' };
 });
 
+ipcMain.handle('get:defaultOutputDir', async () => {
+  return ensureDefaultOutputDir();
+});
+
+ipcMain.handle('install-update', async () => {
+  autoUpdater.quitAndInstall(false, true);
+});
+
 ipcMain.handle('dialog:save', async (event, defaultFilename) => {
   const win = BrowserWindow.fromWebContents(event.sender);
+  const defaultDir = getDefaultOutputDir();
+  const defaultPath = defaultFilename
+    ? path.join(defaultDir, defaultFilename)
+    : path.join(defaultDir, 'output.pdf');
+
   const result = await dialog.showSaveDialog(win, {
     title: 'Save PDF',
-    defaultPath: defaultFilename || 'output.pdf',
+    defaultPath,
     filters: [{ name: 'PDF Files', extensions: ['pdf'] }],
   });
 
@@ -240,7 +334,9 @@ ipcMain.handle('dialog:open-folder', async (event, filePath) => {
 
 // App lifecycle
 app.whenReady().then(() => {
+  ensureDefaultOutputDir();
   createWindow();
+  setupAutoUpdater();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
