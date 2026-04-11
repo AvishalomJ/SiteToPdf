@@ -538,6 +538,42 @@ ipcMain.handle('settings:set-model', async (_event, model) => {
   return { success: true };
 });
 
+// Generate a summary-specific output filename from a URL
+function generateSummaryFilename(url, language) {
+  const LANG_CODES = {
+    'Hebrew': 'he', 'Arabic': 'ar', 'Spanish': 'es', 'French': 'fr',
+    'German': 'de', 'Italian': 'it', 'Portuguese': 'pt', 'Russian': 'ru',
+    'Chinese': 'zh', 'Japanese': 'ja', 'Korean': 'ko',
+  };
+  try {
+    const parsed = new URL(url);
+    const raw = (parsed.hostname + parsed.pathname)
+      .replace(/[.\/_]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .toLowerCase();
+    const base = raw.slice(0, 70) || 'output';
+    const langSuffix = language && language !== 'English' && LANG_CODES[language]
+      ? `-${LANG_CODES[language]}` : '';
+    return `${base}-summary${langSuffix}.pdf`;
+  } catch {
+    return 'summary.pdf';
+  }
+}
+
+// Convert plain/markdown summary text to simple HTML paragraphs
+function summaryToHtml(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .split(/\n\n+/)
+    .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
+    .join('\n');
+}
+
 ipcMain.handle('summarize:content', async (event, { url, language, model: requestModel }) => {
   const win = BrowserWindow.fromWebContents(event.sender);
 
@@ -563,14 +599,15 @@ ipcMain.handle('summarize:content', async (event, { url, language, model: reques
     // Use the existing pipeline modules to fetch and extract content
     const { fetchUrl } = require(path.join(__dirname, '..', 'dist', 'fetcher.js'));
     const { extractContent } = require(path.join(__dirname, '..', 'dist', 'extractor.js'));
+    const { generatePdf } = require(path.join(__dirname, '..', 'dist', 'pdf-generator.js'));
     const { shutdown } = require(path.join(__dirname, '..', 'dist', 'pipeline.js'));
 
     const fetchResult = await fetchUrl(url);
     const extracted = extractContent(fetchResult.html, url);
-    await shutdown();
 
     const contentText = extracted.textContent || '';
     if (!contentText.trim()) {
+      await shutdown();
       throw new Error('No text content could be extracted from this page.');
     }
 
@@ -584,8 +621,23 @@ ipcMain.handle('summarize:content', async (event, { url, language, model: reques
     const prompt = `Summarize this web page content in ${language}. Provide a clear, well-structured summary that captures the key points:\n\n${truncated}`;
     const summary = await callGeminiWithRetry(apiKey, prompt, model, sendProgress);
 
+    // Generate summary PDF
+    sendProgress('Generating summary PDF...');
+    const summaryContent = {
+      title: `Summary: ${extracted.title || url}`,
+      contentHtml: summaryToHtml(summary),
+      textContent: summary,
+    };
+
+    const outputDir = ensureDefaultOutputDir();
+    const filename = generateSummaryFilename(url, language);
+    const outputPath = path.join(outputDir, filename);
+
+    await generatePdf(summaryContent, { outputPath, title: summaryContent.title }, url);
+    await shutdown();
+
     sendProgress('✅ Summarization complete!');
-    return { success: true, summary, title: extracted.title || url };
+    return { success: true, summary, title: extracted.title || url, outputPath };
   } catch (error) {
     // Clean up Playwright if it was started
     try {

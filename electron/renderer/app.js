@@ -268,6 +268,9 @@ async function handleSummarize() {
 
     if (result.success) {
       showSummary(result.title, result.summary);
+      if (result.outputPath) {
+        showResult(true, result.outputPath);
+      }
       playSuccessSound();
     }
   } catch (error) {
