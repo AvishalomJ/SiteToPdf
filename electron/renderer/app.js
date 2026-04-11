@@ -13,7 +13,8 @@ const urlInput = document.getElementById('urlInput');
 const urlListInput = document.getElementById('urlListInput');
 const formatSelect = document.getElementById('formatSelect');
 const compressToggle = document.getElementById('compressToggle');
-const translateSelect = document.getElementById('translateSelect');
+const summaryLangGroup = document.getElementById('summaryLangGroup');
+const summaryLangSelect = document.getElementById('summaryLangSelect');
 const outputPath = document.getElementById('outputPath');
 const browseBtn = document.getElementById('browseBtn');
 const maxDepth = document.getElementById('maxDepth');
@@ -30,6 +31,20 @@ const updateBar = document.getElementById('updateBar');
 const updateMessage = document.getElementById('updateMessage');
 const updateAction = document.getElementById('updateAction');
 const updateDismiss = document.getElementById('updateDismiss');
+const summaryCard = document.getElementById('summaryCard');
+const summaryTitle = document.getElementById('summaryTitle');
+const summaryBody = document.getElementById('summaryBody');
+const closeSummaryBtn = document.getElementById('closeSummaryBtn');
+
+// Settings elements
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsModal = document.getElementById('settingsModal');
+const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+const apiKeyInput = document.getElementById('apiKeyInput');
+const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
+const clearApiKeyBtn = document.getElementById('clearApiKeyBtn');
+const keyStatus = document.getElementById('keyStatus');
+const keyStatusText = document.getElementById('keyStatusText');
 
 // Mode switching
 modeButtons.forEach(btn => {
@@ -47,24 +62,32 @@ modeButtons.forEach(btn => {
 });
 
 function updateVisibleSections() {
+  // Reset visibility
+  singleUrlSection.classList.add('hidden');
+  urlListSection.classList.add('hidden');
+  crawlOptionsSection.classList.add('hidden');
+  summaryLangGroup.classList.add('hidden');
+  urlInput.required = false;
+  urlListInput.required = false;
+
   if (currentMode === 'single') {
     singleUrlSection.classList.remove('hidden');
-    urlListSection.classList.add('hidden');
-    crawlOptionsSection.classList.add('hidden');
     urlInput.required = true;
-    urlListInput.required = false;
+    btnText.textContent = 'Convert to PDF';
   } else if (currentMode === 'crawl') {
     singleUrlSection.classList.remove('hidden');
-    urlListSection.classList.add('hidden');
     crawlOptionsSection.classList.remove('hidden');
     urlInput.required = true;
-    urlListInput.required = false;
+    btnText.textContent = 'Convert to PDF';
   } else if (currentMode === 'list') {
-    singleUrlSection.classList.add('hidden');
     urlListSection.classList.remove('hidden');
-    crawlOptionsSection.classList.add('hidden');
-    urlInput.required = false;
     urlListInput.required = true;
+    btnText.textContent = 'Convert to PDF';
+  } else if (currentMode === 'summarize') {
+    singleUrlSection.classList.remove('hidden');
+    summaryLangGroup.classList.remove('hidden');
+    urlInput.required = true;
+    btnText.textContent = 'Summarize';
   }
 }
 
@@ -80,6 +103,11 @@ browseBtn.addEventListener('click', async () => {
 // Clear log button
 clearLogBtn.addEventListener('click', () => {
   progressLog.innerHTML = '<div class="log-entry log-info">Ready to convert...</div>';
+});
+
+// Close summary card
+closeSummaryBtn.addEventListener('click', () => {
+  summaryCard.classList.add('hidden');
 });
 
 // Progress logging
@@ -132,8 +160,15 @@ form.addEventListener('submit', async (e) => {
     return;
   }
   
-  // Hide previous result
+  // Hide previous results
   resultCard.classList.add('hidden');
+  summaryCard.classList.add('hidden');
+
+  // Summarize mode
+  if (currentMode === 'summarize') {
+    await handleSummarize();
+    return;
+  }
   
   setConverting(true);
   addLogEntry('Starting conversion...', 'info');
@@ -142,7 +177,6 @@ form.addEventListener('submit', async (e) => {
     const commonOptions = {
       format: formatSelect.value,
       compress: compressToggle.checked,
-      translate: translateSelect.value || undefined,
       output: outputPath.value || undefined,
     };
     
@@ -183,15 +217,59 @@ form.addEventListener('submit', async (e) => {
   }
 });
 
+// Summarize handler
+async function handleSummarize() {
+  const url = urlInput.value.trim();
+  if (!url) {
+    addLogEntry('Please enter a URL to summarize', 'error');
+    return;
+  }
+
+  setConverting(true);
+  addLogEntry('Starting summarization...', 'info');
+
+  try {
+    const language = summaryLangSelect.value;
+    const result = await window.siteToPdf.summarizeContent({ url, language });
+
+    if (result.success) {
+      showSummary(result.title, result.summary);
+    }
+  } catch (error) {
+    if (error.message && error.message.includes('NO_API_KEY')) {
+      addLogEntry('No Gemini API key configured. Please open Settings to add your key.', 'error');
+      showResult(false, 'No API key set. Click the ⚙ gear icon in the header to configure your Gemini API key.');
+    } else {
+      addLogEntry(`Error: ${error.message}`, 'error');
+      showResult(false, error.message);
+    }
+  } finally {
+    setConverting(false);
+  }
+}
+
+function showSummary(title, summaryText) {
+  summaryCard.classList.remove('hidden');
+  summaryTitle.textContent = title || 'Summary';
+  // Convert markdown-like line breaks to HTML
+  const formatted = summaryText
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n/g, '<br>');
+  summaryBody.innerHTML = `<p>${formatted}</p>`;
+}
+
 function setConverting(converting) {
   isConverting = converting;
   convertBtn.disabled = converting;
   
   if (converting) {
-    btnText.textContent = 'Converting...';
+    btnText.textContent = currentMode === 'summarize' ? 'Summarizing...' : 'Converting...';
     btnSpinner.classList.remove('hidden');
   } else {
-    btnText.textContent = 'Convert to PDF';
+    btnText.textContent = currentMode === 'summarize' ? 'Summarize' : 'Convert to PDF';
     btnSpinner.classList.add('hidden');
   }
 }
@@ -230,6 +308,72 @@ function showResult(success, data) {
     `;
   }
 }
+
+// --- Settings Modal ---
+settingsBtn.addEventListener('click', async () => {
+  settingsModal.classList.remove('hidden');
+  await loadApiKeyStatus();
+});
+
+closeSettingsBtn.addEventListener('click', () => {
+  settingsModal.classList.add('hidden');
+  apiKeyInput.value = '';
+});
+
+// Close modal on overlay click
+settingsModal.addEventListener('click', (e) => {
+  if (e.target === settingsModal) {
+    settingsModal.classList.add('hidden');
+    apiKeyInput.value = '';
+  }
+});
+
+async function loadApiKeyStatus() {
+  try {
+    const result = await window.siteToPdf.getApiKey();
+    if (result.masked) {
+      keyStatusText.textContent = `Current key: ${result.masked}`;
+      keyStatus.classList.add('has-key');
+      clearApiKeyBtn.classList.remove('hidden');
+    } else {
+      keyStatusText.textContent = 'No API key set';
+      keyStatus.classList.remove('has-key');
+      clearApiKeyBtn.classList.add('hidden');
+    }
+  } catch {
+    keyStatusText.textContent = 'Error loading key status';
+  }
+}
+
+saveApiKeyBtn.addEventListener('click', async () => {
+  const key = apiKeyInput.value.trim();
+  if (!key) return;
+
+  try {
+    const result = await window.siteToPdf.setApiKey(key);
+    if (result.success) {
+      apiKeyInput.value = '';
+      keyStatusText.textContent = `Current key: ${result.masked}`;
+      keyStatus.classList.add('has-key');
+      clearApiKeyBtn.classList.remove('hidden');
+      addLogEntry('API key saved successfully', 'success');
+    }
+  } catch (error) {
+    addLogEntry(`Failed to save API key: ${error.message}`, 'error');
+  }
+});
+
+clearApiKeyBtn.addEventListener('click', async () => {
+  try {
+    await window.siteToPdf.clearApiKey();
+    keyStatusText.textContent = 'No API key set';
+    keyStatus.classList.remove('has-key');
+    clearApiKeyBtn.classList.add('hidden');
+    addLogEntry('API key cleared', 'info');
+  } catch (error) {
+    addLogEntry(`Failed to clear API key: ${error.message}`, 'error');
+  }
+});
 
 // Auto-update listeners
 window.siteToPdf.onUpdateAvailable((data) => {

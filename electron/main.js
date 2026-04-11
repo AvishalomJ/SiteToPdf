@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron')
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
 
 let mainWindow;
 let isConverting = false;
@@ -222,7 +223,6 @@ ipcMain.handle('convert:crawl', async (event, options) => {
       maxPages: options.maxPages,
       delay: options.delay,
       compress: options.compress,
-      translate: options.translate,
     };
 
     const outputPath = await withDefaultOutputDir(crawlOptions, () =>
@@ -354,6 +354,162 @@ ipcMain.handle('dialog:open-folder', async (event, filePath) => {
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
+  }
+});
+
+// --- Settings (API Key Management) ---
+
+function getSettingsPath() {
+  return path.join(app.getPath('userData'), 'settings.json');
+}
+
+function readSettings() {
+  try {
+    const data = fs.readFileSync(getSettingsPath(), 'utf-8');
+    return JSON.parse(data);
+  } catch {
+    return {};
+  }
+}
+
+function writeSettings(settings) {
+  fs.writeFileSync(getSettingsPath(), JSON.stringify(settings, null, 2), 'utf-8');
+}
+
+ipcMain.handle('settings:get-api-key', async () => {
+  const settings = readSettings();
+  const key = settings.geminiApiKey || '';
+  if (!key) return { key: '', masked: '' };
+  const masked = key.length > 8
+    ? key.slice(0, 4) + '...' + key.slice(-4)
+    : '****';
+  return { key: '', masked };
+});
+
+ipcMain.handle('settings:set-api-key', async (_event, apiKey) => {
+  const settings = readSettings();
+  settings.geminiApiKey = apiKey;
+  writeSettings(settings);
+  const masked = apiKey.length > 8
+    ? apiKey.slice(0, 4) + '...' + apiKey.slice(-4)
+    : '****';
+  return { success: true, masked };
+});
+
+ipcMain.handle('settings:clear-api-key', async () => {
+  const settings = readSettings();
+  delete settings.geminiApiKey;
+  writeSettings(settings);
+  return { success: true };
+});
+
+// --- Gemini Summarization ---
+
+function callGeminiApi(apiKey, prompt) {
+  return new Promise((resolve, reject) => {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const body = JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+    });
+
+    const urlObj = new URL(url);
+    const reqOptions = {
+      hostname: urlObj.hostname,
+      path: urlObj.pathname + urlObj.search,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    };
+
+    const req = https.request(reqOptions, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          if (json.error) {
+            reject(new Error(json.error.message || 'Gemini API error'));
+            return;
+          }
+          const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!text) {
+            reject(new Error('No content returned from Gemini API'));
+            return;
+          }
+          resolve(text);
+        } catch (e) {
+          reject(new Error('Failed to parse Gemini API response'));
+        }
+      });
+    });
+
+    req.on('error', (e) => reject(new Error(`Network error: ${e.message}`)));
+    req.setTimeout(60000, () => {
+      req.destroy();
+      reject(new Error('Gemini API request timed out'));
+    });
+    req.write(body);
+    req.end();
+  });
+}
+
+ipcMain.handle('summarize:content', async (event, { url, language }) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+
+  // Check for API key
+  const settings = readSettings();
+  const apiKey = settings.geminiApiKey;
+  if (!apiKey) {
+    throw new Error('NO_API_KEY');
+  }
+
+  const sendProgress = (msg) => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('progress', msg);
+    }
+  };
+
+  try {
+    sendProgress(`Fetching content from ${url}...`);
+
+    // Use the existing pipeline modules to fetch and extract content
+    const { fetchUrl } = require(path.join(__dirname, '..', 'dist', 'fetcher.js'));
+    const { extractContent } = require(path.join(__dirname, '..', 'dist', 'extractor.js'));
+    const { shutdown } = require(path.join(__dirname, '..', 'dist', 'pipeline.js'));
+
+    const fetchResult = await fetchUrl(url);
+    const extracted = extractContent(fetchResult.html, url);
+    await shutdown();
+
+    const contentText = extracted.textContent || '';
+    if (!contentText.trim()) {
+      throw new Error('No text content could be extracted from this page.');
+    }
+
+    // Truncate to ~30k chars to stay within Gemini limits
+    const truncated = contentText.length > 30000
+      ? contentText.slice(0, 30000) + '\n\n[Content truncated for summarization]'
+      : contentText;
+
+    sendProgress(`Sending content to Gemini for summarization in ${language}...`);
+
+    const prompt = `Summarize this web page content in ${language}. Provide a clear, well-structured summary that captures the key points:\n\n${truncated}`;
+    const summary = await callGeminiApi(apiKey, prompt);
+
+    sendProgress('✅ Summarization complete!');
+    return { success: true, summary, title: extracted.title || url };
+  } catch (error) {
+    // Clean up Playwright if it was started
+    try {
+      const { shutdown } = require(path.join(__dirname, '..', 'dist', 'pipeline.js'));
+      await shutdown();
+    } catch {}
+
+    if (error.message === 'NO_API_KEY') throw error;
+    sendProgress(`❌ ${error.message}`);
+    throw error;
   }
 });
 

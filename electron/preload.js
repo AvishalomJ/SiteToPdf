@@ -11,6 +11,12 @@ contextBridge.exposeInMainWorld('siteToPdf', {
   getDefaultOutputDir: () => ipcRenderer.invoke('get:defaultOutputDir'),
   installUpdate: () => ipcRenderer.invoke('install-update'),
   checkForUpdate: () => ipcRenderer.invoke('check-for-update'),
+  // Summarize
+  summarizeContent: (options) => ipcRenderer.invoke('summarize:content', options),
+  // Settings (API key management)
+  getApiKey: () => ipcRenderer.invoke('settings:get-api-key'),
+  setApiKey: (key) => ipcRenderer.invoke('settings:set-api-key', key),
+  clearApiKey: () => ipcRenderer.invoke('settings:clear-api-key'),
   onTriggerCheckForUpdate: (callback) => {
     const listener = () => callback();
     ipcRenderer.on('trigger-check-for-update', listener);

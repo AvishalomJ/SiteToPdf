@@ -32,6 +32,12 @@
         </svg>
         <span id="checkUpdateLabel">Check for Update</span>
       </button>
+      <button id="settingsBtn" class="settings-btn" title="Settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
     </div>
     </header>
 
@@ -53,6 +59,7 @@
             <button type="button" class="mode-btn active" data-mode="single">Single URL</button>
             <button type="button" class="mode-btn" data-mode="crawl">Crawl Site</button>
             <button type="button" class="mode-btn" data-mode="list">URL List</button>
+            <button type="button" class="mode-btn" data-mode="summarize">Summarize</button>
           </div>
         </div>
 
@@ -102,22 +109,22 @@
               </label>
             </div>
 
-            <!-- Translate -->
-            <div class="option-group">
-              <label for="translateSelect" class="option-label">Translate To</label>
-              <select id="translateSelect" class="select-field">
-                <option value="">None</option>
-                <option value="he">Hebrew</option>
-                <option value="ar">Arabic</option>
-                <option value="es">Spanish</option>
-                <option value="fr">French</option>
-                <option value="de">German</option>
-                <option value="it">Italian</option>
-                <option value="pt">Portuguese</option>
-                <option value="ru">Russian</option>
-                <option value="zh">Chinese</option>
-                <option value="ja">Japanese</option>
-                <option value="ko">Korean</option>
+            <!-- Summary Language (visible in Summarize mode only) -->
+            <div class="option-group hidden" id="summaryLangGroup">
+              <label for="summaryLangSelect" class="option-label">Summary Language</label>
+              <select id="summaryLangSelect" class="select-field">
+                <option value="English">English</option>
+                <option value="Hebrew">Hebrew</option>
+                <option value="Arabic">Arabic</option>
+                <option value="Spanish">Spanish</option>
+                <option value="French">French</option>
+                <option value="German">German</option>
+                <option value="Italian">Italian</option>
+                <option value="Portuguese">Portuguese</option>
+                <option value="Russian">Russian</option>
+                <option value="Chinese">Chinese</option>
+                <option value="Japanese">Japanese</option>
+                <option value="Korean">Korean</option>
               </select>
             </div>
 
@@ -184,7 +191,43 @@
         <div class="result-content" id="resultContent"></div>
       </div>
 
+      <!-- Summarize Result Area -->
+      <div class="summary-card hidden" id="summaryCard">
+        <div class="summary-header">
+          <h3 class="summary-title" id="summaryTitle">Summary</h3>
+          <button type="button" id="closeSummaryBtn" class="btn-text-only">Close</button>
+        </div>
+        <div class="summary-body" id="summaryBody"></div>
+      </div>
+
     </main>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay hidden" id="settingsModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">Settings</h2>
+        <button type="button" id="closeSettingsBtn" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="settings-section">
+          <label class="settings-label">Gemini API Key</label>
+          <p class="settings-hint">Your API key is stored locally on your machine and never shared with third parties.</p>
+          <div class="settings-key-status" id="keyStatus">
+            <span id="keyStatusText">No API key set</span>
+          </div>
+          <div class="settings-input-group">
+            <input type="password" id="apiKeyInput" class="input-field" placeholder="Enter your Gemini API key">
+            <button type="button" id="saveApiKeyBtn" class="btn-primary btn-sm">Save</button>
+          </div>
+          <button type="button" id="clearApiKeyBtn" class="btn-text-only btn-danger hidden">Clear API Key</button>
+          <p class="settings-hint" style="margin-top: 0.75rem;">
+            Get your API key from <span class="settings-link">https://aistudio.google.com/apikey</span>
+          </p>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>
