@@ -385,6 +385,7 @@ clearApiKeyBtn.addEventListener('click', async () => {
 const updatePercent = document.getElementById('updatePercent');
 const updateProgressContainer = document.getElementById('updateProgressContainer');
 const updateProgressBar = document.getElementById('updateProgressBar');
+let pendingUpdateVersion = null; // tracks downloaded update for "reopen" button
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + ' B';
@@ -392,15 +393,28 @@ function formatBytes(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-window.siteToPdf.onUpdateAvailable((data) => {
+function showUpdateReady(version) {
+  pendingUpdateVersion = version;
+  updateBar.classList.remove('hidden', 'downloading');
+  updateMessage.textContent = `Update v${version} ready to install.`;
+  updateAction.classList.remove('hidden');
+  updatePercent.classList.add('hidden');
+  updateProgressContainer.classList.add('hidden');
+}
+
+function showDownloading(version) {
   updateBar.classList.remove('hidden');
   updateBar.classList.add('downloading');
-  updateMessage.textContent = `Downloading update v${data.version}...`;
+  updateMessage.textContent = `Downloading update v${version}...`;
   updateAction.classList.add('hidden');
   updatePercent.classList.remove('hidden');
   updatePercent.textContent = '0%';
   updateProgressContainer.classList.remove('hidden');
   updateProgressBar.style.width = '0%';
+}
+
+window.siteToPdf.onUpdateAvailable((data) => {
+  showDownloading(data.version);
 });
 
 window.siteToPdf.onDownloadProgress((data) => {
@@ -414,11 +428,7 @@ window.siteToPdf.onDownloadProgress((data) => {
 });
 
 window.siteToPdf.onUpdateDownloaded((data) => {
-  updateBar.classList.remove('hidden', 'downloading');
-  updateMessage.textContent = `Update v${data.version} ready to install.`;
-  updateAction.classList.remove('hidden');
-  updatePercent.classList.add('hidden');
-  updateProgressContainer.classList.add('hidden');
+  showUpdateReady(data.version);
 });
 
 updateAction.addEventListener('click', () => {
@@ -427,6 +437,13 @@ updateAction.addEventListener('click', () => {
 
 updateDismiss.addEventListener('click', () => {
   updateBar.classList.add('hidden');
+  // If an update is ready, show "Restart & Update" on the check button
+  if (pendingUpdateVersion) {
+    checkUpdateLabel.textContent = 'Restart & Update';
+    checkUpdateBtn.classList.remove('update-found');
+    checkUpdateBtn.classList.add('update-ready');
+    checkUpdateBtn.disabled = false;
+  }
 });
 
 // Check for Update button
@@ -434,6 +451,12 @@ const checkUpdateBtn = document.getElementById('checkUpdateBtn');
 const checkUpdateLabel = document.getElementById('checkUpdateLabel');
 
 async function performUpdateCheck() {
+  // If update already downloaded, just reopen the update bar or install
+  if (pendingUpdateVersion) {
+    showUpdateReady(pendingUpdateVersion);
+    return;
+  }
+
   if (checkUpdateBtn.disabled) return;
   checkUpdateBtn.disabled = true;
   checkUpdateLabel.textContent = 'Checking...';
@@ -441,7 +464,19 @@ async function performUpdateCheck() {
 
   try {
     const result = await window.siteToPdf.checkForUpdate();
-    if (result.status === 'available') {
+    if (result.status === 'downloaded') {
+      // Update already downloaded — show "ready to install" immediately
+      checkUpdateBtn.classList.remove('checking');
+      showUpdateReady(result.version);
+      checkUpdateBtn.disabled = false;
+      return;
+    } else if (result.status === 'downloading') {
+      // Download in progress — show the progress bar
+      checkUpdateBtn.classList.remove('checking');
+      showDownloading(result.version);
+      checkUpdateBtn.disabled = false;
+      return;
+    } else if (result.status === 'available') {
       checkUpdateLabel.textContent = `v${result.version} available!`;
       checkUpdateBtn.classList.remove('checking');
       checkUpdateBtn.classList.add('update-found');
@@ -488,7 +523,14 @@ async function performUpdateCheck() {
   }, 5000);
 }
 
-checkUpdateBtn.addEventListener('click', performUpdateCheck);
+checkUpdateBtn.addEventListener('click', () => {
+  // If update is downloaded and button shows "Restart & Update", install directly
+  if (checkUpdateBtn.classList.contains('update-ready')) {
+    window.siteToPdf.installUpdate();
+    return;
+  }
+  performUpdateCheck();
+});
 
 // Listen for menu-triggered update check
 window.siteToPdf.onTriggerCheckForUpdate(() => {

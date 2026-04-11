@@ -6,6 +6,7 @@ const https = require('https');
 
 let mainWindow;
 let isConverting = false;
+let updateState = { status: 'idle', version: null }; // idle | downloading | downloaded
 
 // Default output directory: Documents/SiteToPdf
 function getDefaultOutputDir() {
@@ -27,6 +28,7 @@ function setupAutoUpdater() {
   autoUpdater.autoInstallOnAppQuit = true;
 
   autoUpdater.on('update-available', (info) => {
+    updateState = { status: 'downloading', version: info.version };
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('update-available', {
         version: info.version,
@@ -47,6 +49,7 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on('update-downloaded', (info) => {
+    updateState = { status: 'downloaded', version: info.version };
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('update-downloaded', {
         version: info.version,
@@ -315,6 +318,14 @@ ipcMain.handle('get:defaultOutputDir', async () => {
 });
 
 ipcMain.handle('check-for-update', async () => {
+  // If update already downloaded, skip the network check
+  if (updateState.status === 'downloaded') {
+    return { status: 'downloaded', version: updateState.version };
+  }
+  // If currently downloading, tell the renderer to show the bar
+  if (updateState.status === 'downloading') {
+    return { status: 'downloading', version: updateState.version };
+  }
   try {
     const result = await autoUpdater.checkForUpdatesAndNotify();
     if (result && result.updateInfo && result.updateInfo.version) {
