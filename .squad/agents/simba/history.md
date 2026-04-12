@@ -135,3 +135,16 @@
 - **Key pattern:** `NO_API_KEY` error sentinel allows renderer to show friendly "configure your key" message instead of generic error.
 - **Playwright cleanup:** Summarize handler uses `pipeline.js` `shutdown()` (not fetcher.js) for proper browser cleanup.
 
+### Summarize PDF Generation (v0.4.1) — Simba Sprint
+
+- **Feature:** Summarize mode now generates a PDF alongside the summary card UI.
+- **main.js changes:**
+  - `generateSummaryFilename(url, language)` derives filenames from URL hostname+pathname with `-summary` suffix. Non-English languages get a short code suffix (e.g., `-he`, `-es`). Max 70 chars for the URL portion.
+  - `summaryToHtml(text)` converts Gemini's markdown-like output to simple HTML paragraphs with bold/italic support.
+  - `summarize:content` handler now: fetches → extracts → calls Gemini → generates PDF → shuts down (single `shutdown()` at the end, not after fetch).
+  - Returns `{ success, summary, title, outputPath }` — the new `outputPath` field tells the renderer where the PDF was saved.
+  - PDF is saved to `Documents/SiteToPdf/` via `ensureDefaultOutputDir()`.
+- **app.js changes:** `handleSummarize()` now calls `showResult(true, result.outputPath)` after `showSummary()`, so the user sees Open PDF / Open Folder buttons.
+- **Key pattern:** `generatePdf()` from `dist/pdf-generator.js` is called with an `ExtractedContent`-shaped object — `{ title, contentHtml, textContent }`. The title is prefixed with "Summary: " for clarity in the PDF header.
+- **Shutdown ordering:** `shutdown()` is called ONCE after both fetch+extract AND PDF generation complete. The previous code called it after fetch, before Gemini — that would have closed the PDF browser prematurely.
+- **Version:** 0.4.0 → 0.4.1. Release: `v0.4.1` on GitHub with installer + blockmap + latest.yml.

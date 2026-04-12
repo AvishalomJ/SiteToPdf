@@ -160,6 +160,63 @@ RTL is implemented as a **CSS overlay** pattern rather than a separate complete 
 - If a future language needs a different font stack (e.g., Arabic-specific), `buildRtlStyles` could accept the language code and branch on it. Current implementation uses a shared Semitic/Hebrew font stack.
 - The `originalTitle` field on `ExtractedContent` is set by the translation pipeline (Simba's domain). Rafiki's code only reads it.
 
+### Summarize PDF Generation
+
+**Author:** Simba (Backend Dev)  
+**Date:** 2026-04-11  
+**Status:** Implemented (v0.4.1)
+
+#### Context
+
+The Summarize feature previously only displayed the AI summary in a card on the UI. Users wanted a PDF file as well, matching the behavior of the other conversion modes.
+
+#### Decision
+
+- The `summarize:content` IPC handler now generates a PDF after receiving the Gemini response, using the existing `generatePdf()` from `dist/pdf-generator.js`.
+- Summary text is converted to simple HTML via `summaryToHtml()` (handles paragraphs, bold, italic).
+- PDF filename is derived from URL (same pattern as pipeline's `generateOutputFilename`) with a `-summary` suffix and optional language code for non-English summaries.
+- PDFs are saved to the default output directory (`Documents/SiteToPdf/`).
+- `shutdown()` is called once at the end — after both URL fetch and PDF generation — not between them.
+- The renderer now shows both the summary card AND the result card (Open PDF / Open Folder buttons) on success.
+
+#### Rationale
+
+- Reuses existing `generatePdf()` rather than introducing a new PDF generation path, keeping the codebase DRY.
+- Single `shutdown()` prevents closing the Playwright PDF browser before it's used.
+- Filename convention (`-summary` suffix) distinguishes summary PDFs from regular conversion PDFs of the same URL.
+
+#### Implications
+
+- If Rafiki changes `generatePdf()`'s `ExtractedContent` contract, the summary handler's object shape must be updated too.
+- The language-to-code mapping in `generateSummaryFilename` must stay in sync with the language dropdown in `index.html`.
+
+### User Directives
+
+**Date:** 2026-04-11  
+**Status:** Captured
+
+#### Version Bumping Policy (2026-04-11T19:21:21Z)
+
+**By:** AvishalomJ (via Copilot)
+
+Every meaningful change (feature addition or fix) requires a version bump in `package.json`. This ensures the installer and auto-updater track every release.
+
+#### Push-to-Master Workflow (2026-04-11T19:08:55Z and 2026-04-11T19:09:30Z)
+
+**By:** AvishalomJ (via Copilot)
+
+- Always push changes to remote after committing
+- Never create PRs — push directly to master branch
+
+#### Gemini API Key Security Policy (2026-04-11T19:15:30Z)
+
+**By:** AvishalomJ (via Copilot)
+
+- Gemini API key must be stored locally only (user environment)
+- Never send to 3rd parties
+- Never push to GitHub
+- Never commit to source control
+
 ## Governance
 
 - All meaningful changes require team consensus

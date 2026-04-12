@@ -106,3 +106,17 @@
 - **Orchestration log:** `.squad/orchestration-log/2026-03-31T1305-rafiki.md`
 - **Session log:** `.squad/log/2026-03-31T1305-translate-feature.md`
 
+### 2026-04-11 — Summarize feature extended with PDF generation
+
+**Context:** Simba extended Gemini AI summarization to generate PDFs in addition to on-screen cards, matching the behavior of other conversion modes.
+
+**Integration with Rafiki's `generatePdf()`:**
+- Summarize handler reuses existing `generatePdf()` function from `dist/pdf-generator.js` (Rafiki's domain)
+- Summary text converted to HTML via helper `summaryToHtml()`
+- Calls `generatePdf()` with mock `ExtractedContent` object: `{ title, contentHtml: html, textContent: text }`
+- If `ExtractedContent` contract changes, the summary handler's mock object shape must be updated to match
+
+**Key decision:** PDF generation for summaries (Simba) depends on `generatePdf()` contract (Rafiki owns). Coordination required for any changes to `ExtractedContent` interface.
+
+- **Orchestration log:** `.squad/orchestration-log/2026-04-11T21-15-simba.md`
+- **Session log:** `.squad/log/2026-04-11T21-15-summarize-pdf.md`
