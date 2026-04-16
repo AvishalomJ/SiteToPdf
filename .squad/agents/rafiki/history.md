@@ -129,3 +129,29 @@
 
 - **New dependency:** `pdf-lib` (pure JS, no binary deps)
 - **Orchestration log:** `.squad/orchestration-log/2026-04-16T0635-simba.md`
+
+### 2026-04-16 — Web frontend created (web/frontend/)
+
+**Context:** Created the web frontend for SiteToPdf as part of the Aspire web deployment initiative. The web version mirrors the Electron desktop app's UI but replaces IPC calls with HTTP API + SSE.
+
+**Files created:**
+- `web/frontend/index.html` — Full UI with mode selector (5 modes), form inputs, progress/result/summary cards, settings modal. Removed update bar and check-for-update button. Added "Web" badge in header. CSP allows `connect-src 'self'` for API calls. Settings link is now a real `<a>` tag (not a span).
+- `web/frontend/styles.css` — Copied from Electron with update-bar styles removed. Added `.web-badge` styling, `.btn-download` for PDF download buttons, `.merge-file-size` for file size display.
+- `web/frontend/app.js` — Complete rewrite of the Electron app.js:
+  - `window.siteToPdf.*` IPC calls → `fetch()` POST to `/api/convert/single`, `/api/convert/crawl`, `/api/convert/list`, `/api/summarize`
+  - IPC progress events → `EventSource` SSE on `/api/jobs/{jobId}/status` (listens for `progress`, `complete`, `error` events)
+  - File open/folder open → Download link via `/api/jobs/{jobId}/download`
+  - File save dialog / Browse button → Removed (not applicable on web)
+  - Output path field → Removed (server decides output location)
+  - API key storage: `localStorage` (keys: `sitetopdf_gemini_api_key`, `sitetopdf_gemini_model`)
+  - API key is only sent in POST body for `/api/summarize` requests — never for other endpoints
+  - Merge PDFs: uses `<input type="file" multiple accept=".pdf">` instead of Electron file dialog; reads files as base64 for POSTing to `/api/merge`
+  - All Electron-only features removed: auto-update, update bar, installUpdate, checkForUpdate, openFile, openFolder, chooseSavePath
+  - All shared features preserved: mode switching, progress logging with timestamps/colors, clear log, success sound, settings modal, summary card, form validation
+
+**Key design decisions:**
+- Self-contained static files — no build step, no npm, just HTML/CSS/JS served as-is
+- Same visual design as desktop app — users feel at home
+- Merge endpoint marked as Phase 2 TODO — frontend code is ready, waiting for Simba's backend
+- API key client-side validation: summarize mode checks for key before making the API call
+- SSE connection is tracked in `activeEventSource` and properly cleaned up between jobs

@@ -172,3 +172,32 @@
   - File dedup in renderer prevents adding same path twice.
   - `formatGroup`/`compressGroup` hidden in merge mode since they're irrelevant for PDF merging.
 - **Version:** 0.4.1 → 0.5.0. Release: `v0.5.0` on GitHub with installer + blockmap + latest.yml.
+
+### 2026-04-16 — Web API Server + Aspire AppHost (Phase 1 MVP)
+
+- **New directory:** `web/server/` — Fastify HTTP API server for web-based PDF conversion.
+- **Server architecture:** Fastify 5 with CORS, static file serving from `web/frontend/`, health endpoint at `/health`.
+- **Job-based pattern:** All conversion/summarize routes return `{ jobId }` immediately, run work asynchronously. SSE (`text/event-stream`) streams real-time progress. Download endpoint streams PDF then cleans up.
+- **Routes:**
+  - `POST /api/convert/single` — single URL → PDF via `runSingleUrl()`
+  - `POST /api/convert/crawl` — crawl site → combined PDF via `runCrawl()`
+  - `POST /api/convert/list` — URL list → combined PDF via `runList()`
+  - `POST /api/summarize` — fetch + extract + Gemini summarize → summary PDF
+  - `GET /api/jobs/:id/status` — SSE progress stream
+  - `GET /api/jobs/:id/download` — PDF download + cleanup
+  - `GET /health` — health check with uptime and version
+- **Services:**
+  - `job-manager.ts` — in-memory Map, EventEmitter for SSE, UUID generation, TTL cleanup (configurable via `JOB_TTL_MINUTES` env, default 60m).
+  - `browser-pool.ts` — semaphore-based concurrency control (`MAX_CONCURRENT_BROWSERS` env, default 2), queue at capacity, 5-minute per-job timeout.
+  - `gemini.ts` — extracted `callGeminiApi()`, `callGeminiWithRetry()`, `summaryToHtml()`, `GEMINI_MODELS` from `electron/main.js`. TypeScript typed. API key is per-request (from client), never stored server-side.
+- **Console capture pattern:** `withConsoleCapture()` monkey-patches `console.log/warn` during pipeline execution to forward messages to job manager as progress updates. Restores originals in `finally` block. Same pattern as Electron's IPC progress forwarding.
+- **Pipeline imports:** Server uses `require()` at runtime to load compiled `dist/pipeline.js`, `dist/fetcher.js`, etc. The server TypeScript compiles separately to `dist/web/server/`.
+- **Aspire AppHost:** `aspire/SiteToPdf.AppHost/` uses `Aspire.AppHost.Sdk/13.2.2` (NuGet-based, not workload-based — Aspire workload is deprecated in .NET 10). `AddDockerfile()` builds and runs the Node.js container. HTTP endpoint on port 3000, health check at `/health`, env vars for `NODE_ENV`, `MAX_CONCURRENT_BROWSERS`, `JOB_TTL_MINUTES`.
+- **Dockerfile:** `node:20-slim`, installs Playwright Chromium with OS deps, two-stage npm install (root + server), builds both TypeScript projects, exposes port 3000.
+- **Key decisions:**
+  - Aspire SDK 13.2.2 (not 9.x) — the `Aspire.Hosting.NodeJs` package was renamed to `Aspire.Hosting.JavaScript`, but `AddDockerfile()` from base `Aspire.Hosting.AppHost` is sufficient for containerized Node.js.
+  - `.slnx` format (new .NET 10 default) instead of `.sln`.
+  - Added `**/bin/` and `**/obj/` to `.gitignore` for .NET build artifacts.
+  - Server has its own `tsconfig.json` with `outDir: ../../dist/web/server` — separate from root tsconfig.
+  - No existing files modified — purely additive.
+- **Build verification:** Root `npm run build` ✓, server `npx tsc` ✓, Aspire `dotnet build` ✓.
