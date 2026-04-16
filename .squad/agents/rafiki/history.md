@@ -120,3 +120,12 @@
 
 - **Orchestration log:** `.squad/orchestration-log/2026-04-11T21-15-simba.md`
 - **Session log:** `.squad/log/2026-04-11T21-15-summarize-pdf.md`
+
+### 2026-04-16 — PDF Merge Feature (v0.5.0) — Simba Implementation Note
+
+**Context:** Simba implemented PDF merge feature (5th UI mode) using `pdf-lib` library for combining multiple PDF files.
+
+**Note for Rafiki:** `pdf-lib` is a pure JavaScript PDF manipulation library now added to `package.json` as a production dependency. It provides PDF reading/writing without Playwright or native binaries. If future features require PDF operations (page extraction, rotation, annotation), `pdf-lib` already supports those. The merge handler in Simba's domain doesn't touch Rafiki's PDF generation code — they're independent.
+
+- **New dependency:** `pdf-lib` (pure JS, no binary deps)
+- **Orchestration log:** `.squad/orchestration-log/2026-04-16T0635-simba.md`
