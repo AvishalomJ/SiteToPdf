@@ -17,8 +17,11 @@ async function start(): Promise<void> {
   await app.register(fastifyCors, { origin: true });
 
   // Serve the frontend static files
+  // Compiled JS runs from dist/web/server/ — resolve to repo root, then web/frontend
+  const repoRoot = path.resolve(__dirname, '..', '..', '..');
+  const frontendDir = path.resolve(repoRoot, 'web', 'frontend');
   await app.register(fastifyStatic, {
-    root: path.resolve(__dirname, '..', '..', 'frontend'),
+    root: frontendDir,
     prefix: '/',
   });
 

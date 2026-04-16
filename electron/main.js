@@ -3,6 +3,7 @@ const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
+const { PDFDocument } = require('pdf-lib');
 
 let mainWindow;
 let isConverting = false;
@@ -372,11 +373,18 @@ ipcMain.handle('dialog:open-pdfs', async (event) => {
 
 ipcMain.handle('merge:pdfs', async (event, { files, outputPath: userOutputPath }) => {
   if (isConverting) {
-    throw new Error('A conversion is already in progress');
+    return { success: false, error: 'A conversion is already in progress' };
   }
 
   if (!files || files.length < 2) {
-    throw new Error('Please select at least 2 PDF files to merge');
+    return { success: false, error: 'Please select at least 2 PDF files to merge' };
+  }
+
+  // Validate all files exist before starting
+  for (const file of files) {
+    if (!fs.existsSync(file)) {
+      return { success: false, error: `File not found: ${path.basename(file)}` };
+    }
   }
 
   isConverting = true;
@@ -389,8 +397,6 @@ ipcMain.handle('merge:pdfs', async (event, { files, outputPath: userOutputPath }
   };
 
   try {
-    const { PDFDocument } = require('pdf-lib');
-
     sendProgress(`Merging ${files.length} PDF files...`);
     const mergedPdf = await PDFDocument.create();
 
@@ -434,10 +440,9 @@ ipcMain.handle('merge:pdfs', async (event, { files, outputPath: userOutputPath }
   } catch (error) {
     isConverting = false;
     const errorMsg = error.message || String(error);
-    if (win && !win.isDestroyed()) {
-      win.webContents.send('error', errorMsg);
-    }
-    throw error;
+    console.error('[merge:pdfs] Error:', errorMsg, error.stack);
+    sendProgress(`❌ Merge failed: ${errorMsg}`);
+    return { success: false, error: errorMsg };
   }
 });
 

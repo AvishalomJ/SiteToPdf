@@ -346,12 +346,17 @@ async function handleMerge() {
       outputPath: outputPath.value || undefined,
     });
 
-    if (result.success) {
+    if (result && result.success) {
       playSuccessSound();
+      showResult(true, result.outputPath);
+    } else if (result && result.error) {
+      addLogEntry(`Error: ${result.error}`, 'error');
+      showResult(false, result.error);
     }
+    setConverting(false);
   } catch (error) {
-    addLogEntry(`Error: ${error.message}`, 'error');
-    showResult(false, error.message);
+    addLogEntry(`Error: ${error.message || error}`, 'error');
+    showResult(false, error.message || String(error));
     setConverting(false);
   }
 }
