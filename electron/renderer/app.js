@@ -2,6 +2,7 @@
 let currentMode = 'single';
 let isConverting = false;
 let defaultOutputDir = '';
+let mergeFiles = [];
 
 // Elements
 const form = document.getElementById('convertForm');
@@ -37,6 +38,12 @@ const summaryCard = document.getElementById('summaryCard');
 const summaryTitle = document.getElementById('summaryTitle');
 const summaryBody = document.getElementById('summaryBody');
 const closeSummaryBtn = document.getElementById('closeSummaryBtn');
+const mergeSection = document.getElementById('mergeSection');
+const addPdfFilesBtn = document.getElementById('addPdfFilesBtn');
+const mergeFileList = document.getElementById('mergeFileList');
+const optionsSection = document.getElementById('optionsSection');
+const formatGroup = document.getElementById('formatGroup');
+const compressGroup = document.getElementById('compressGroup');
 
 // Settings elements
 const settingsBtn = document.getElementById('settingsBtn');
@@ -70,6 +77,9 @@ function updateVisibleSections() {
   crawlOptionsSection.classList.add('hidden');
   summaryLangGroup.classList.add('hidden');
   summaryModelGroup.classList.add('hidden');
+  mergeSection.classList.add('hidden');
+  formatGroup.classList.remove('hidden');
+  compressGroup.classList.remove('hidden');
   urlInput.required = false;
   urlListInput.required = false;
 
@@ -92,6 +102,11 @@ function updateVisibleSections() {
     summaryModelGroup.classList.remove('hidden');
     urlInput.required = true;
     btnText.textContent = 'Summarize';
+  } else if (currentMode === 'merge') {
+    mergeSection.classList.remove('hidden');
+    formatGroup.classList.add('hidden');
+    compressGroup.classList.add('hidden');
+    btnText.textContent = 'Merge PDFs';
   }
 }
 
@@ -115,6 +130,65 @@ clearLogBtn.addEventListener('click', () => {
 closeSummaryBtn.addEventListener('click', () => {
   summaryCard.classList.add('hidden');
 });
+
+// --- Merge PDFs ---
+
+addPdfFilesBtn.addEventListener('click', async () => {
+  const paths = await window.siteToPdf.openPdfFiles();
+  if (paths && paths.length > 0) {
+    // Deduplicate
+    paths.forEach(p => {
+      if (!mergeFiles.includes(p)) {
+        mergeFiles.push(p);
+      }
+    });
+    renderMergeFileList();
+  }
+});
+
+function renderMergeFileList() {
+  if (mergeFiles.length === 0) {
+    mergeFileList.innerHTML = '<div class="merge-empty-state">No PDF files selected. Click "Add PDF Files" to begin.</div>';
+    return;
+  }
+  mergeFileList.innerHTML = mergeFiles.map((filePath, index) => {
+    const filename = filePath.split(/[\\/]/).pop();
+    return `
+      <div class="merge-file-item" data-index="${index}">
+        <span class="merge-file-number">${index + 1}.</span>
+        <span class="merge-file-name" title="${filePath}">${filename}</span>
+        <div class="merge-file-actions">
+          <button type="button" class="merge-btn-move" data-action="up" data-index="${index}" ${index === 0 ? 'disabled' : ''} title="Move up">▲</button>
+          <button type="button" class="merge-btn-move" data-action="down" data-index="${index}" ${index === mergeFiles.length - 1 ? 'disabled' : ''} title="Move down">▼</button>
+          <button type="button" class="merge-btn-remove" data-index="${index}" title="Remove">✕</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Attach event listeners
+  mergeFileList.querySelectorAll('.merge-btn-move').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = parseInt(btn.dataset.index);
+      const action = btn.dataset.action;
+      if (action === 'up' && i > 0) {
+        [mergeFiles[i - 1], mergeFiles[i]] = [mergeFiles[i], mergeFiles[i - 1]];
+        renderMergeFileList();
+      } else if (action === 'down' && i < mergeFiles.length - 1) {
+        [mergeFiles[i], mergeFiles[i + 1]] = [mergeFiles[i + 1], mergeFiles[i]];
+        renderMergeFileList();
+      }
+    });
+  });
+
+  mergeFileList.querySelectorAll('.merge-btn-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = parseInt(btn.dataset.index);
+      mergeFiles.splice(i, 1);
+      renderMergeFileList();
+    });
+  });
+}
 
 // Progress logging
 function playSuccessSound() {
@@ -196,6 +270,12 @@ form.addEventListener('submit', async (e) => {
     await handleSummarize();
     return;
   }
+
+  // Merge mode
+  if (currentMode === 'merge') {
+    await handleMerge();
+    return;
+  }
   
   setConverting(true);
   addLogEntry('Starting conversion...', 'info');
@@ -246,6 +326,35 @@ form.addEventListener('submit', async (e) => {
     setConverting(false);
   }
 });
+
+// Merge handler
+async function handleMerge() {
+  if (mergeFiles.length < 2) {
+    addLogEntry('Please select at least 2 PDF files to merge', 'error');
+    return;
+  }
+
+  setConverting(true);
+  addLogEntry(`Merging ${mergeFiles.length} PDF files...`, 'info');
+
+  // Auto-scroll to progress section
+  document.getElementById('progressCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  try {
+    const result = await window.siteToPdf.mergePdfs({
+      files: mergeFiles,
+      outputPath: outputPath.value || undefined,
+    });
+
+    if (result.success) {
+      playSuccessSound();
+    }
+  } catch (error) {
+    addLogEntry(`Error: ${error.message}`, 'error');
+    showResult(false, error.message);
+    setConverting(false);
+  }
+}
 
 // Summarize handler
 async function handleSummarize() {
@@ -308,10 +417,22 @@ function setConverting(converting) {
   convertBtn.disabled = converting;
   
   if (converting) {
-    btnText.textContent = currentMode === 'summarize' ? 'Summarizing...' : 'Converting...';
+    if (currentMode === 'summarize') {
+      btnText.textContent = 'Summarizing...';
+    } else if (currentMode === 'merge') {
+      btnText.textContent = 'Merging...';
+    } else {
+      btnText.textContent = 'Converting...';
+    }
     btnSpinner.classList.remove('hidden');
   } else {
-    btnText.textContent = currentMode === 'summarize' ? 'Summarize' : 'Convert to PDF';
+    if (currentMode === 'summarize') {
+      btnText.textContent = 'Summarize';
+    } else if (currentMode === 'merge') {
+      btnText.textContent = 'Merge PDFs';
+    } else {
+      btnText.textContent = 'Convert to PDF';
+    }
     btnSpinner.classList.add('hidden');
   }
 }

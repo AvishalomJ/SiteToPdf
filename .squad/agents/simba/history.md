@@ -148,3 +148,5 @@
 - **Key pattern:** `generatePdf()` from `dist/pdf-generator.js` is called with an `ExtractedContent`-shaped object — `{ title, contentHtml, textContent }`. The title is prefixed with "Summary: " for clarity in the PDF header.
 - **Shutdown ordering:** `shutdown()` is called ONCE after both fetch+extract AND PDF generation complete. The previous code called it after fetch, before Gemini — that would have closed the PDF browser prematurely.
 - **Version:** 0.4.0 → 0.4.1. Release: `v0.4.1` on GitHub with installer + blockmap + latest.yml.
+- **Orchestration log:** `.squad/orchestration-log/2026-04-11T21-15-simba.md`
+

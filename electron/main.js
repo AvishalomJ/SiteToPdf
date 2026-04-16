@@ -357,6 +357,90 @@ ipcMain.handle('install-update', async () => {
   autoUpdater.quitAndInstall(false, true);
 });
 
+// --- PDF Merge ---
+
+ipcMain.handle('dialog:open-pdfs', async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const result = await dialog.showOpenDialog(win, {
+    title: 'Select PDF Files to Merge',
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: 'PDF Files', extensions: ['pdf'] }],
+  });
+  if (result.canceled) return [];
+  return result.filePaths;
+});
+
+ipcMain.handle('merge:pdfs', async (event, { files, outputPath: userOutputPath }) => {
+  if (isConverting) {
+    throw new Error('A conversion is already in progress');
+  }
+
+  if (!files || files.length < 2) {
+    throw new Error('Please select at least 2 PDF files to merge');
+  }
+
+  isConverting = true;
+  const win = BrowserWindow.fromWebContents(event.sender);
+
+  const sendProgress = (msg) => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('progress', msg);
+    }
+  };
+
+  try {
+    const { PDFDocument } = require('pdf-lib');
+
+    sendProgress(`Merging ${files.length} PDF files...`);
+    const mergedPdf = await PDFDocument.create();
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const filename = path.basename(file);
+      sendProgress(`Processing (${i + 1}/${files.length}): ${filename}`);
+
+      const bytes = fs.readFileSync(file);
+      const pdf = await PDFDocument.load(bytes, { ignoreEncryption: true });
+      const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+      pages.forEach(page => mergedPdf.addPage(page));
+    }
+
+    // Determine output path
+    const now = new Date();
+    const ts = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
+    const defaultFilename = `merged-${ts}.pdf`;
+    let finalPath;
+    if (userOutputPath) {
+      finalPath = userOutputPath;
+    } else {
+      const outputDir = ensureDefaultOutputDir();
+      finalPath = path.join(outputDir, defaultFilename);
+    }
+
+    sendProgress('Saving merged PDF...');
+    const mergedBytes = await mergedPdf.save();
+    fs.writeFileSync(finalPath, mergedBytes);
+
+    const totalPages = mergedPdf.getPageCount();
+    sendProgress(`✅ Merged ${files.length} files (${totalPages} pages) into ${path.basename(finalPath)}`);
+
+    isConverting = false;
+
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('complete', { outputPath: finalPath });
+    }
+
+    return { success: true, outputPath: finalPath };
+  } catch (error) {
+    isConverting = false;
+    const errorMsg = error.message || String(error);
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('error', errorMsg);
+    }
+    throw error;
+  }
+});
+
 ipcMain.handle('dialog:save', async (event, defaultFilename) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   const defaultDir = getDefaultOutputDir();

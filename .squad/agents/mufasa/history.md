@@ -27,3 +27,16 @@
 - **CLI pattern:** Don't mix `.argument()` on the root program with `.command()` subcommands in Commander — use `{ isDefault: true }` on a named subcommand instead. Otherwise parent options shadow subcommand options.
 - **Key files:** `src/pipeline.ts` (runCrawl), `src/index.ts` (crawl subcommand)
 - **Crawl options:** `--depth N`, `--max-pages N`, `--delay Ms`, `--format A4|Letter`, `-o output.pdf`
+
+### 2026-04-12 — Aspire Web Deployment Architecture Analysis
+
+- **Key finding:** The entire `src/` pipeline (fetcher, extractor, pdf-generator, pipeline, translator, types) has **zero Electron dependencies**. It imports only Playwright, Cheerio, Commander, and Ollama HTTP. This means it can run in any Node.js server without modification.
+- **Electron coupling is thin:** `electron/main.js` is ~640 lines that wire IPC handlers to `dist/pipeline.js` calls + Gemini summarization + settings file I/O + native dialogs. The preload bridge (`window.siteToPdf`) is the sole API surface for the renderer.
+- **Gemini summarization** (callGeminiApi, callGeminiWithRetry, summaryToHtml) is embedded in `electron/main.js` but has no Electron imports — it's pure `https.request()`. Should be extracted into a shared module for web reuse.
+- **Architecture decision:** Node.js API server (Fastify) + .NET Aspire container orchestration. Chose Node.js backend over C#/.NET backend because the TypeScript pipeline is the core value — rewriting it has zero upside. Aspire supports non-.NET containers via `AddDockerfile()`.
+- **Job-based API pattern:** Web conversions are long-running. POST returns a job ID; client streams progress via Server-Sent Events (SSE); downloads PDF when done. Replaces Electron's synchronous IPC `invoke/on` pattern.
+- **Playwright server concerns:** Browser pooling (max N concurrent), per-job timeouts, container memory limits (Chromium = 100-300MB per instance).
+- **API key strategy for web:** User-provided per-request (stored in `localStorage`, sent in request header). Matches desktop's per-user model. No server-side secret storage initially.
+- **Frontend reuse:** HTML/CSS from `electron/renderer/` is reusable as-is. Only `app.js` needs adaptation (fetch API + SSE instead of `window.siteToPdf.*` IPC).
+- **Translator on web:** Recommended Gemini for web translation instead of Ollama to avoid GPU/LLM sidecar complexity. Keep Ollama for desktop/CLI.
+- **Decision document:** `.squad/decisions/inbox/mufasa-aspire-architecture.md` — awaiting AvishalomJ approval.

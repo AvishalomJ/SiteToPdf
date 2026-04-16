@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld('siteToPdf', {
   getDefaultOutputDir: () => ipcRenderer.invoke('get:defaultOutputDir'),
   installUpdate: () => ipcRenderer.invoke('install-update'),
   checkForUpdate: () => ipcRenderer.invoke('check-for-update'),
+  // Merge PDFs
+  openPdfFiles: () => ipcRenderer.invoke('dialog:open-pdfs'),
+  mergePdfs: (options) => ipcRenderer.invoke('merge:pdfs', options),
   // Summarize
   summarizeContent: (options) => ipcRenderer.invoke('summarize:content', options),
   // Settings (API key management)

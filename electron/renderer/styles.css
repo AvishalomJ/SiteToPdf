@@ -769,6 +769,98 @@ input:checked + .toggle-slider:before {
 }
 
 /* Scrollbar Styling */
+
+/* Merge PDF File List */
+.merge-file-list {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.merge-empty-state {
+  padding: 1.25rem;
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}
+
+.merge-file-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  transition: background 0.15s;
+}
+
+.merge-file-item:last-child {
+  border-bottom: none;
+}
+
+.merge-file-item:hover {
+  background: var(--color-card);
+}
+
+.merge-file-number {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  min-width: 1.5rem;
+  text-align: right;
+}
+
+.merge-file-name {
+  flex: 1;
+  font-size: 0.85rem;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.merge-file-actions {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.merge-btn-move,
+.merge-btn-remove {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-card);
+  color: var(--color-text-secondary);
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  padding: 0;
+  line-height: 1;
+}
+
+.merge-btn-move:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+
+.merge-btn-move:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.merge-btn-remove:hover {
+  background: var(--color-error);
+  color: white;
+  border-color: var(--color-error);
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

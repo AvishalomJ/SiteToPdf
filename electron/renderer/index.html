@@ -66,6 +66,7 @@
             <button type="button" class="mode-btn" data-mode="crawl">Crawl Site</button>
             <button type="button" class="mode-btn" data-mode="list">URL List</button>
             <button type="button" class="mode-btn" data-mode="summarize">Summarize</button>
+            <button type="button" class="mode-btn" data-mode="merge">Merge PDFs</button>
           </div>
         </div>
 
@@ -92,13 +93,24 @@
           ></textarea>
         </div>
 
+        <!-- Merge PDFs Section (hidden by default) -->
+        <div class="section hidden" id="mergeSection">
+          <label class="section-label">PDF Files to Merge</label>
+          <button type="button" id="addPdfFilesBtn" class="btn-secondary" style="margin-bottom: 0.75rem;">
+            <span>+ Add PDF Files</span>
+          </button>
+          <div id="mergeFileList" class="merge-file-list">
+            <div class="merge-empty-state">No PDF files selected. Click "Add PDF Files" to begin.</div>
+          </div>
+        </div>
+
         <!-- Options Panel -->
-        <div class="section">
+        <div class="section" id="optionsSection">
           <label class="section-label">Options</label>
           <div class="options-grid">
             
             <!-- Page Format -->
-            <div class="option-group">
+            <div class="option-group" id="formatGroup">
               <label for="formatSelect" class="option-label">Page Format</label>
               <select id="formatSelect" class="select-field">
                 <option value="A4">A4</option>
@@ -107,7 +119,7 @@
             </div>
 
             <!-- Compress -->
-            <div class="option-group">
+            <div class="option-group" id="compressGroup">
               <label for="compressToggle" class="option-label">Compress PDF</label>
               <label class="toggle-switch">
                 <input type="checkbox" id="compressToggle">
