@@ -5,6 +5,10 @@ node_modules/
 dist/
 release/
 
+# .NET build output
+**/bin/
+**/obj/
+
 # Generated PDFs
 *.pdf
 

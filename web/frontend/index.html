@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'">
+  <title>SiteToPdf — Web</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+      <div class="header-title-group">
+        <h1 class="app-title">
+          <svg class="app-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          SiteToPdf
+        </h1>
+        <p class="app-subtitle">Convert web pages to clean PDFs</p>
+      </div>
+      <span class="web-badge">Web</span>
+      <button id="settingsBtn" class="settings-btn" title="Settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
+    </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <form id="convertForm" class="form-card">
+        
+        <!-- Mode Selector -->
+        <div class="section">
+          <label class="section-label">Conversion Mode</label>
+          <div class="mode-selector">
+            <button type="button" class="mode-btn active" data-mode="single">Single URL</button>
+            <button type="button" class="mode-btn" data-mode="crawl">Crawl Site</button>
+            <button type="button" class="mode-btn" data-mode="list">URL List</button>
+            <button type="button" class="mode-btn" data-mode="summarize">Summarize</button>
+            <button type="button" class="mode-btn" data-mode="merge">Merge PDFs</button>
+          </div>
+        </div>
+
+        <!-- URL Input -->
+        <div class="section" id="singleUrlSection">
+          <label for="urlInput" class="section-label">URL</label>
+          <input 
+            type="url" 
+            id="urlInput" 
+            class="input-field" 
+            placeholder="https://example.com"
+            required
+          />
+        </div>
+
+        <!-- URL List Input (hidden by default) -->
+        <div class="section hidden" id="urlListSection">
+          <label for="urlListInput" class="section-label">URLs (one per line)</label>
+          <textarea 
+            id="urlListInput" 
+            class="textarea-field" 
+            rows="6"
+            placeholder="https://example.com/page1&#10;https://example.com/page2&#10;https://example.com/page3"
+          ></textarea>
+        </div>
+
+        <!-- Merge PDFs Section (hidden by default) -->
+        <div class="section hidden" id="mergeSection">
+          <label class="section-label">PDF Files to Merge</label>
+          <input type="file" id="pdfFileInput" multiple accept=".pdf" class="hidden">
+          <button type="button" id="addPdfFilesBtn" class="btn-secondary" style="margin-bottom: 0.75rem;">
+            <span>+ Add PDF Files</span>
+          </button>
+          <div id="mergeFileList" class="merge-file-list">
+            <div class="merge-empty-state">No PDF files selected. Click "Add PDF Files" to begin.</div>
+          </div>
+        </div>
+
+        <!-- Options Panel -->
+        <div class="section" id="optionsSection">
+          <label class="section-label">Options</label>
+          <div class="options-grid">
+            
+            <!-- Page Format -->
+            <div class="option-group" id="formatGroup">
+              <label for="formatSelect" class="option-label">Page Format</label>
+              <select id="formatSelect" class="select-field">
+                <option value="A4">A4</option>
+                <option value="Letter">Letter</option>
+              </select>
+            </div>
+
+            <!-- Compress -->
+            <div class="option-group" id="compressGroup">
+              <label for="compressToggle" class="option-label">Compress PDF</label>
+              <label class="toggle-switch">
+                <input type="checkbox" id="compressToggle">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <!-- Summary Language (visible in Summarize mode only) -->
+            <div class="option-group hidden" id="summaryLangGroup">
+              <label for="summaryLangSelect" class="option-label">Summary Language</label>
+              <select id="summaryLangSelect" class="select-field">
+                <option value="English">English</option>
+                <option value="Hebrew">Hebrew</option>
+                <option value="Arabic">Arabic</option>
+                <option value="Spanish">Spanish</option>
+                <option value="French">French</option>
+                <option value="German">German</option>
+                <option value="Italian">Italian</option>
+                <option value="Portuguese">Portuguese</option>
+                <option value="Russian">Russian</option>
+                <option value="Chinese">Chinese</option>
+                <option value="Japanese">Japanese</option>
+                <option value="Korean">Korean</option>
+              </select>
+            </div>
+
+            <!-- Gemini Model (visible in Summarize mode only) -->
+            <div class="option-group hidden" id="summaryModelGroup">
+              <label for="summaryModelSelect" class="option-label">Gemini Model</label>
+              <select id="summaryModelSelect" class="select-field">
+                <option value="gemini-2.5-flash">2.5 Flash (fast, latest)</option>
+                <option value="gemini-2.5-pro">2.5 Pro (higher quality)</option>
+                <option value="gemini-2.0-flash">2.0 Flash (legacy)</option>
+              </select>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Crawl Options (hidden by default) -->
+        <div class="section hidden" id="crawlOptionsSection">
+          <label class="section-label">Crawl Options</label>
+          <div class="options-grid">
+            
+            <div class="option-group">
+              <label for="maxDepth" class="option-label">Max Depth</label>
+              <input type="number" id="maxDepth" class="input-field" value="3" min="1" max="10">
+            </div>
+
+            <div class="option-group">
+              <label for="maxPages" class="option-label">Max Pages</label>
+              <input type="number" id="maxPages" class="input-field" value="50" min="1" max="500">
+            </div>
+
+            <div class="option-group">
+              <label for="crawlDelay" class="option-label">Delay (ms)</label>
+              <input type="number" id="crawlDelay" class="input-field" value="500" min="0" max="5000" step="100">
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Convert Button -->
+        <div class="section">
+          <button type="submit" id="convertBtn" class="btn-primary">
+            <span class="btn-text">Convert to PDF</span>
+            <svg class="btn-spinner hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+            </svg>
+          </button>
+        </div>
+
+      </form>
+
+      <!-- Progress Area -->
+      <div class="progress-card" id="progressCard">
+        <div class="progress-header">
+          <h3 class="progress-title">Progress</h3>
+          <button type="button" id="clearLogBtn" class="btn-text-only">Clear</button>
+        </div>
+        <div class="progress-log" id="progressLog">
+          <div class="log-entry log-info">Ready to convert...</div>
+        </div>
+      </div>
+
+      <!-- Result Area -->
+      <div class="result-card hidden" id="resultCard">
+        <div class="result-content" id="resultContent"></div>
+      </div>
+
+      <!-- Summarize Result Area -->
+      <div class="summary-card hidden" id="summaryCard">
+        <div class="summary-header">
+          <h3 class="summary-title" id="summaryTitle">Summary</h3>
+          <button type="button" id="closeSummaryBtn" class="btn-text-only">Close</button>
+        </div>
+        <div class="summary-body" id="summaryBody"></div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay hidden" id="settingsModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">Settings</h2>
+        <button type="button" id="closeSettingsBtn" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="settings-section">
+          <label class="settings-label">Gemini API Key</label>
+          <p class="settings-hint">Your API key is stored in your browser's local storage and never sent to any third party. It is only included when making Summarize requests.</p>
+          <div class="settings-key-status" id="keyStatus">
+            <span id="keyStatusText">No API key set</span>
+          </div>
+          <div class="settings-input-group">
+            <input type="password" id="apiKeyInput" class="input-field" placeholder="Enter your Gemini API key">
+            <button type="button" id="saveApiKeyBtn" class="btn-primary btn-sm">Save</button>
+          </div>
+          <button type="button" id="clearApiKeyBtn" class="btn-text-only btn-danger hidden">Clear API Key</button>
+          <p class="settings-hint" style="margin-top: 0.75rem;">
+            Get your API key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" class="settings-link">https://aistudio.google.com/apikey</a>
+          </p>
+        </div>
+        <div class="settings-section" style="margin-top: 1.25rem;">
+          <label class="settings-label">Gemini Model</label>
+          <p class="settings-hint">Choose the model for summarization. Different models have separate quotas.</p>
+          <select id="geminiModelSelect" class="select-field">
+            <option value="gemini-2.5-flash">Gemini 2.5 Flash (fast, latest)</option>
+            <option value="gemini-2.5-pro">Gemini 2.5 Pro (higher quality)</option>
+            <option value="gemini-2.0-flash">Gemini 2.0 Flash (legacy)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
