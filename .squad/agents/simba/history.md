@@ -150,3 +150,25 @@
 - **Version:** 0.4.0 → 0.4.1. Release: `v0.4.1` on GitHub with installer + blockmap + latest.yml.
 - **Orchestration log:** `.squad/orchestration-log/2026-04-11T21-15-simba.md`
 
+### PDF Merge Feature (v0.5.0) — Simba Sprint
+
+- **Feature:** 5th mode "Merge PDFs" — select multiple PDF files, reorder, remove, merge into one.
+- **Dependency:** `pdf-lib` (pure JS, no binary deps) added for PDF merging. No Playwright needed.
+- **main.js additions:**
+  - `dialog:open-pdfs` IPC handler — multi-select file dialog filtered to `*.pdf`.
+  - `merge:pdfs` IPC handler — reads each PDF with `PDFDocument.load()`, copies pages via `copyPages()`, saves merged result. Uses `ignoreEncryption: true` for resilience.
+  - Auto-generates `merged-YYYY-MM-DD-HHmmss.pdf` in `Documents/SiteToPdf/` when no custom output path specified.
+  - Sends per-file progress messages to renderer.
+- **preload.js additions:** `openPdfFiles()`, `mergePdfs(options)` bridges.
+- **index.html additions:** 5th mode button, `#mergeSection` with Add PDF Files button and `#mergeFileList` container. Added `id` attributes to `formatGroup` and `compressGroup` for per-mode visibility control.
+- **app.js additions:**
+  - `mergeFiles` state array, `renderMergeFileList()` with reorder/remove controls.
+  - `handleMerge()` validates ≥2 files, calls `mergePdfs`, plays success sound.
+  - `updateVisibleSections()` hides URL inputs, format, compress for merge mode; keeps output path visible.
+  - `setConverting()` handles merge mode button text ("Merging..." / "Merge PDFs").
+- **styles.css additions:** `.merge-file-list`, `.merge-file-item`, `.merge-file-actions`, `.merge-btn-move`, `.merge-btn-remove`, `.merge-empty-state` — all using existing CSS variables.
+- **Key patterns:**
+  - Merge doesn't touch `isConverting` in main.js until the handler starts, same pattern as convert handlers.
+  - File dedup in renderer prevents adding same path twice.
+  - `formatGroup`/`compressGroup` hidden in merge mode since they're irrelevant for PDF merging.
+- **Version:** 0.4.1 → 0.5.0. Release: `v0.5.0` on GitHub with installer + blockmap + latest.yml.
