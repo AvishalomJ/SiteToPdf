@@ -3,6 +3,7 @@ let currentMode = 'single';
 let isConverting = false;
 let defaultOutputDir = '';
 let mergeFiles = [];
+let imageFiles = [];
 
 // Elements
 const form = document.getElementById('convertForm');
@@ -41,6 +42,9 @@ const closeSummaryBtn = document.getElementById('closeSummaryBtn');
 const mergeSection = document.getElementById('mergeSection');
 const addPdfFilesBtn = document.getElementById('addPdfFilesBtn');
 const mergeFileList = document.getElementById('mergeFileList');
+const imageSection = document.getElementById('imageSection');
+const addImageFilesBtn = document.getElementById('addImageFilesBtn');
+const imageFileList = document.getElementById('imageFileList');
 const optionsSection = document.getElementById('optionsSection');
 const formatGroup = document.getElementById('formatGroup');
 const compressGroup = document.getElementById('compressGroup');
@@ -78,6 +82,7 @@ function updateVisibleSections() {
   summaryLangGroup.classList.add('hidden');
   summaryModelGroup.classList.add('hidden');
   mergeSection.classList.add('hidden');
+  imageSection.classList.add('hidden');
   formatGroup.classList.remove('hidden');
   compressGroup.classList.remove('hidden');
   urlInput.required = false;
@@ -107,6 +112,11 @@ function updateVisibleSections() {
     formatGroup.classList.add('hidden');
     compressGroup.classList.add('hidden');
     btnText.textContent = 'Merge PDFs';
+  } else if (currentMode === 'imagetopdf') {
+    imageSection.classList.remove('hidden');
+    formatGroup.classList.add('hidden');
+    compressGroup.classList.add('hidden');
+    btnText.textContent = 'Convert to PDF';
   }
 }
 
@@ -186,6 +196,63 @@ function renderMergeFileList() {
       const i = parseInt(btn.dataset.index);
       mergeFiles.splice(i, 1);
       renderMergeFileList();
+    });
+  });
+}
+
+// --- Image to PDF ---
+
+addImageFilesBtn.addEventListener('click', async () => {
+  const paths = await window.siteToPdf.openImageFiles();
+  if (paths && paths.length > 0) {
+    paths.forEach(p => {
+      if (!imageFiles.includes(p)) {
+        imageFiles.push(p);
+      }
+    });
+    renderImageFileList();
+  }
+});
+
+function renderImageFileList() {
+  if (imageFiles.length === 0) {
+    imageFileList.innerHTML = '<div class="merge-empty-state">No images selected. Click "Add Images" to begin.</div>';
+    return;
+  }
+  imageFileList.innerHTML = imageFiles.map((filePath, index) => {
+    const filename = filePath.split(/[\\/]/).pop();
+    return `
+      <div class="merge-file-item" data-index="${index}">
+        <span class="merge-file-number">${index + 1}.</span>
+        <span class="merge-file-name" title="${filePath}">${filename}</span>
+        <div class="merge-file-actions">
+          <button type="button" class="merge-btn-move" data-action="up" data-index="${index}" ${index === 0 ? 'disabled' : ''} title="Move up">▲</button>
+          <button type="button" class="merge-btn-move" data-action="down" data-index="${index}" ${index === imageFiles.length - 1 ? 'disabled' : ''} title="Move down">▼</button>
+          <button type="button" class="merge-btn-remove" data-index="${index}" title="Remove">✕</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  imageFileList.querySelectorAll('.merge-btn-move').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = parseInt(btn.dataset.index);
+      const action = btn.dataset.action;
+      if (action === 'up' && i > 0) {
+        [imageFiles[i - 1], imageFiles[i]] = [imageFiles[i], imageFiles[i - 1]];
+        renderImageFileList();
+      } else if (action === 'down' && i < imageFiles.length - 1) {
+        [imageFiles[i], imageFiles[i + 1]] = [imageFiles[i + 1], imageFiles[i]];
+        renderImageFileList();
+      }
+    });
+  });
+
+  imageFileList.querySelectorAll('.merge-btn-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = parseInt(btn.dataset.index);
+      imageFiles.splice(i, 1);
+      renderImageFileList();
     });
   });
 }
@@ -276,6 +343,12 @@ form.addEventListener('submit', async (e) => {
     await handleMerge();
     return;
   }
+
+  // Image to PDF mode
+  if (currentMode === 'imagetopdf') {
+    await handleImageToPdf();
+    return;
+  }
   
   setConverting(true);
   addLogEntry('Starting conversion...', 'info');
@@ -343,6 +416,39 @@ async function handleMerge() {
   try {
     const result = await window.siteToPdf.mergePdfs({
       files: mergeFiles,
+      outputPath: outputPath.value || undefined,
+    });
+
+    if (result && result.success) {
+      playSuccessSound();
+      showResult(true, result.outputPath);
+    } else if (result && result.error) {
+      addLogEntry(`Error: ${result.error}`, 'error');
+      showResult(false, result.error);
+    }
+    setConverting(false);
+  } catch (error) {
+    addLogEntry(`Error: ${error.message || error}`, 'error');
+    showResult(false, error.message || String(error));
+    setConverting(false);
+  }
+}
+
+// Image to PDF handler
+async function handleImageToPdf() {
+  if (imageFiles.length === 0) {
+    addLogEntry('Please select at least one image file', 'error');
+    return;
+  }
+
+  setConverting(true);
+  addLogEntry(`Converting ${imageFiles.length} image(s) to PDF...`, 'info');
+
+  document.getElementById('progressCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  try {
+    const result = await window.siteToPdf.convertImagesToPdf({
+      files: imageFiles,
       outputPath: outputPath.value || undefined,
     });
 

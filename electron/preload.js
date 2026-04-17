@@ -14,6 +14,9 @@ contextBridge.exposeInMainWorld('siteToPdf', {
   // Merge PDFs
   openPdfFiles: () => ipcRenderer.invoke('dialog:open-pdfs'),
   mergePdfs: (options) => ipcRenderer.invoke('merge:pdfs', options),
+  // Image to PDF
+  openImageFiles: () => ipcRenderer.invoke('dialog:open-images'),
+  convertImagesToPdf: (options) => ipcRenderer.invoke('convert:images-to-pdf', options),
   // Summarize
   summarizeContent: (options) => ipcRenderer.invoke('summarize:content', options),
   // Settings (API key management)

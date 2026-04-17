@@ -67,6 +67,7 @@
             <button type="button" class="mode-btn" data-mode="list">URL List</button>
             <button type="button" class="mode-btn" data-mode="summarize">Summarize</button>
             <button type="button" class="mode-btn" data-mode="merge">Merge PDFs</button>
+            <button type="button" class="mode-btn" data-mode="imagetopdf">Image → PDF</button>
           </div>
         </div>
 
@@ -101,6 +102,17 @@
           </button>
           <div id="mergeFileList" class="merge-file-list">
             <div class="merge-empty-state">No PDF files selected. Click "Add PDF Files" to begin.</div>
+          </div>
+        </div>
+
+        <!-- Image to PDF Section (hidden by default) -->
+        <div class="section hidden" id="imageSection">
+          <label class="section-label">Image Files (PNG, JPG)</label>
+          <button type="button" id="addImageFilesBtn" class="btn-secondary" style="margin-bottom: 0.75rem;">
+            <span>+ Add Images</span>
+          </button>
+          <div id="imageFileList" class="merge-file-list">
+            <div class="merge-empty-state">No images selected. Click "Add Images" to begin.</div>
           </div>
         </div>
 

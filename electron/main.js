@@ -371,6 +371,109 @@ ipcMain.handle('dialog:open-pdfs', async (event) => {
   return result.filePaths;
 });
 
+// --- Image to PDF ---
+
+ipcMain.handle('dialog:open-images', async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const result = await dialog.showOpenDialog(win, {
+    title: 'Select Image Files',
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg'] }],
+  });
+  if (result.canceled) return [];
+  return result.filePaths;
+});
+
+ipcMain.handle('convert:images-to-pdf', async (event, { files, outputPath: userOutputPath }) => {
+  if (isConverting) {
+    return { success: false, error: 'A conversion is already in progress' };
+  }
+
+  if (!files || files.length === 0) {
+    return { success: false, error: 'Please select at least one image file' };
+  }
+
+  for (const file of files) {
+    if (!fs.existsSync(file)) {
+      return { success: false, error: `File not found: ${path.basename(file)}` };
+    }
+  }
+
+  isConverting = true;
+  const win = BrowserWindow.fromWebContents(event.sender);
+
+  const sendProgress = (msg) => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('progress', msg);
+    }
+  };
+
+  try {
+    sendProgress(`Converting ${files.length} image(s) to PDF...`);
+    const pdfDoc = await PDFDocument.create();
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const filename = path.basename(file);
+      const ext = path.extname(file).toLowerCase();
+      sendProgress(`Processing (${i + 1}/${files.length}): ${filename}`);
+
+      const imageBytes = fs.readFileSync(file);
+      let image;
+
+      if (ext === '.png') {
+        image = await pdfDoc.embedPng(imageBytes);
+      } else if (ext === '.jpg' || ext === '.jpeg') {
+        image = await pdfDoc.embedJpg(imageBytes);
+      } else {
+        sendProgress(`⚠ Skipping unsupported format: ${filename}`);
+        continue;
+      }
+
+      const { width, height } = image;
+      const page = pdfDoc.addPage([width, height]);
+      page.drawImage(image, { x: 0, y: 0, width, height });
+    }
+
+    if (pdfDoc.getPageCount() === 0) {
+      isConverting = false;
+      return { success: false, error: 'No valid images were processed' };
+    }
+
+    const now = new Date();
+    const ts = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
+    const defaultFilename = `images-${ts}.pdf`;
+    let finalPath;
+    if (userOutputPath) {
+      finalPath = userOutputPath;
+    } else {
+      const outputDir = ensureDefaultOutputDir();
+      finalPath = path.join(outputDir, defaultFilename);
+    }
+
+    sendProgress('Saving PDF...');
+    const pdfBytes = await pdfDoc.save();
+    fs.writeFileSync(finalPath, pdfBytes);
+
+    const totalPages = pdfDoc.getPageCount();
+    sendProgress(`✅ Converted ${totalPages} image(s) into ${path.basename(finalPath)}`);
+
+    isConverting = false;
+
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('complete', { outputPath: finalPath });
+    }
+
+    return { success: true, outputPath: finalPath };
+  } catch (error) {
+    isConverting = false;
+    const errorMsg = error.message || String(error);
+    console.error('[convert:images-to-pdf] Error:', errorMsg, error.stack);
+    sendProgress(`❌ Image conversion failed: ${errorMsg}`);
+    return { success: false, error: errorMsg };
+  }
+});
+
 ipcMain.handle('merge:pdfs', async (event, { files, outputPath: userOutputPath }) => {
   if (isConverting) {
     return { success: false, error: 'A conversion is already in progress' };
