@@ -10,6 +10,7 @@ let currentMode = 'single';
 let isConverting = false;
 let activeEventSource = null;
 let mergeFiles = []; // { file: File, name: string }
+let imageFiles = []; // Array of File objects
 
 // ── Elements ──
 const form = document.getElementById('convertForm');
@@ -43,6 +44,10 @@ const mergeSection = document.getElementById('mergeSection');
 const addPdfFilesBtn = document.getElementById('addPdfFilesBtn');
 const mergeFileList = document.getElementById('mergeFileList');
 const pdfFileInput = document.getElementById('pdfFileInput');
+const imageSection = document.getElementById('imageSection');
+const addImageFilesBtn = document.getElementById('addImageFilesBtn');
+const imageFileList = document.getElementById('imageFileList');
+const imageFileInput = document.getElementById('imageFileInput');
 const optionsSection = document.getElementById('optionsSection');
 const formatGroup = document.getElementById('formatGroup');
 const compressGroup = document.getElementById('compressGroup');
@@ -57,6 +62,43 @@ const clearApiKeyBtn = document.getElementById('clearApiKeyBtn');
 const keyStatus = document.getElementById('keyStatus');
 const keyStatusText = document.getElementById('keyStatusText');
 const geminiModelSelect = document.getElementById('geminiModelSelect');
+
+// ── Nav Tab Switching ──
+const navTabs = document.querySelectorAll('.nav-tab');
+const convertModes = document.getElementById('convertModes');
+const toolsModes = document.getElementById('toolsModes');
+
+navTabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    navTabs.forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const group = tab.dataset.group;
+    if (group === 'convert') {
+      convertModes.classList.remove('hidden');
+      toolsModes.classList.add('hidden');
+      // Select first mode in group if current mode isn't in this group
+      if (!['single', 'crawl', 'list'].includes(currentMode)) {
+        currentMode = 'single';
+        updateModeButtons();
+        updateVisibleSections();
+      }
+    } else {
+      convertModes.classList.add('hidden');
+      toolsModes.classList.remove('hidden');
+      if (!['merge', 'summarize', 'imagetopdf'].includes(currentMode)) {
+        currentMode = 'merge';
+        updateModeButtons();
+        updateVisibleSections();
+      }
+    }
+  });
+});
+
+function updateModeButtons() {
+  document.querySelectorAll('.mode-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === currentMode);
+  });
+}
 
 // ── Mode Switching ──
 modeButtons.forEach(btn => {
@@ -75,6 +117,7 @@ function updateVisibleSections() {
   summaryLangGroup.classList.add('hidden');
   summaryModelGroup.classList.add('hidden');
   mergeSection.classList.add('hidden');
+  imageSection.classList.add('hidden');
   formatGroup.classList.remove('hidden');
   compressGroup.classList.remove('hidden');
   urlInput.required = false;
@@ -104,6 +147,11 @@ function updateVisibleSections() {
     formatGroup.classList.add('hidden');
     compressGroup.classList.add('hidden');
     btnText.textContent = 'Merge PDFs';
+  } else if (currentMode === 'imagetopdf') {
+    imageSection.classList.remove('hidden');
+    formatGroup.classList.add('hidden');
+    compressGroup.classList.add('hidden');
+    btnText.textContent = 'Convert to PDF';
   }
 }
 
@@ -182,6 +230,67 @@ function renderMergeFileList() {
       const i = parseInt(btn.dataset.index);
       mergeFiles.splice(i, 1);
       renderMergeFileList();
+    });
+  });
+}
+
+// ── Image to PDF File Handling ──
+addImageFilesBtn.addEventListener('click', () => {
+  imageFileInput.click();
+});
+
+imageFileInput.addEventListener('change', () => {
+  const files = Array.from(imageFileInput.files);
+  files.forEach(file => {
+    // Deduplicate by name + size
+    const isDup = imageFiles.some(f => f.name === file.name && f.size === file.size);
+    if (!isDup) {
+      imageFiles.push(file);
+    }
+  });
+  imageFileInput.value = '';
+  renderImageFileList();
+});
+
+function renderImageFileList() {
+  if (imageFiles.length === 0) {
+    imageFileList.innerHTML = '<div class="merge-empty-state">No images selected. Click "Add Images" to begin.</div>';
+    return;
+  }
+  imageFileList.innerHTML = imageFiles.map((file, index) => {
+    return `
+      <div class="merge-file-item" data-index="${index}">
+        <span class="merge-file-number">${index + 1}.</span>
+        <span class="merge-file-name" title="${file.name}">${file.name}</span>
+        <span class="merge-file-size">${formatFileSize(file.size)}</span>
+        <div class="merge-file-actions">
+          <button type="button" class="merge-btn-move" data-action="up" data-index="${index}" ${index === 0 ? 'disabled' : ''} title="Move up">▲</button>
+          <button type="button" class="merge-btn-move" data-action="down" data-index="${index}" ${index === imageFiles.length - 1 ? 'disabled' : ''} title="Move down">▼</button>
+          <button type="button" class="merge-btn-remove" data-index="${index}" title="Remove">✕</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  imageFileList.querySelectorAll('.merge-btn-move').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = parseInt(btn.dataset.index);
+      const action = btn.dataset.action;
+      if (action === 'up' && i > 0) {
+        [imageFiles[i - 1], imageFiles[i]] = [imageFiles[i], imageFiles[i - 1]];
+        renderImageFileList();
+      } else if (action === 'down' && i < imageFiles.length - 1) {
+        [imageFiles[i], imageFiles[i + 1]] = [imageFiles[i + 1], imageFiles[i]];
+        renderImageFileList();
+      }
+    });
+  });
+
+  imageFileList.querySelectorAll('.merge-btn-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = parseInt(btn.dataset.index);
+      imageFiles.splice(i, 1);
+      renderImageFileList();
     });
   });
 }
@@ -306,6 +415,10 @@ form.addEventListener('submit', async (e) => {
     await handleMerge();
     return;
   }
+  if (currentMode === 'imagetopdf') {
+    await handleImageToPdf();
+    return;
+  }
 
   setConverting(true);
   addLogEntry('Starting conversion...', 'info');
@@ -366,6 +479,49 @@ form.addEventListener('submit', async (e) => {
     setConverting(false);
   }
 });
+
+// ── Image to PDF Handler ──
+async function handleImageToPdf() {
+  if (imageFiles.length === 0) {
+    addLogEntry('Please select at least 1 image file', 'error');
+    return;
+  }
+
+  setConverting(true);
+  addLogEntry(`Converting ${imageFiles.length} image(s) to PDF...`, 'info');
+  document.getElementById('progressCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  try {
+    const formData = new FormData();
+    imageFiles.forEach(file => {
+      formData.append('images', file);
+    });
+
+    const resp = await fetch('/api/convert/images-to-pdf', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: resp.statusText }));
+      throw new Error(err.error || err.message || `HTTP ${resp.status}`);
+    }
+
+    const { jobId } = await resp.json();
+    addLogEntry(`Image-to-PDF job started: ${jobId}`, 'info');
+
+    const result = await connectJobSSE(jobId);
+
+    addLogEntry('✅ PDF generated from images', 'success');
+    showResult(true, result);
+    playSuccessSound();
+  } catch (error) {
+    addLogEntry(`Error: ${error.message}`, 'error');
+    showResult(false, error.message);
+  } finally {
+    setConverting(false);
+  }
+}
 
 // ── Merge Handler ──
 // TODO: The /api/merge endpoint is Phase 2 — Simba will implement it.
@@ -482,8 +638,10 @@ function showSummary(title, summaryText) {
 function setConverting(converting) {
   isConverting = converting;
   convertBtn.disabled = converting;
+  const formCard = document.querySelector('.form-card');
 
   if (converting) {
+    formCard.classList.add('converting');
     if (currentMode === 'summarize') {
       btnText.textContent = 'Summarizing...';
     } else if (currentMode === 'merge') {
@@ -493,10 +651,13 @@ function setConverting(converting) {
     }
     btnSpinner.classList.remove('hidden');
   } else {
+    formCard.classList.remove('converting');
     if (currentMode === 'summarize') {
       btnText.textContent = 'Summarize';
     } else if (currentMode === 'merge') {
       btnText.textContent = 'Merge PDFs';
+    } else if (currentMode === 'imagetopdf') {
+      btnText.textContent = 'Convert to PDF';
     } else {
       btnText.textContent = 'Convert to PDF';
     }
@@ -508,13 +669,14 @@ function showResult(success, data) {
   resultCard.classList.remove('hidden');
 
   if (success) {
-    // data is the jobId — provide a download link
-    const downloadUrl = `/api/jobs/${data}/download`;
+    // data can be a string (jobId) or an object { jobId, displayFilename }
+    const jobId = typeof data === 'string' ? data : (data.jobId || data);
+    const filename = (typeof data === 'object' && data.displayFilename) ? data.displayFilename : `SiteToPdf-${jobId}.pdf`;
+    const downloadUrl = `/api/jobs/${jobId}/download`;
     const fullDownloadUrl = window.location.origin + downloadUrl;
-    const filename = `SiteToPdf-${data}.pdf`;
     const gmailSubject = encodeURIComponent(`SiteToPdf: ${filename}`);
     const gmailBody = encodeURIComponent(
-      `Hi,\n\nPlease find the PDF document generated by SiteToPdf.\n\nPlease download and attach the PDF from the link below:\n${fullDownloadUrl}\n\nGenerated by SiteToPdf.`
+      `Hi,\n\nI'd like to share a PDF document with you: "${filename}"\n\nThis document was generated from a website using SiteToPdf.\n\nPlease note: The PDF file needs to be attached manually after opening this email draft.\n\nBest regards`
     );
     const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&su=${gmailSubject}&body=${gmailBody}`;
 
@@ -522,10 +684,10 @@ function showResult(success, data) {
       <div class="result-success">
         <div class="result-message success">
           <span>✅</span>
-          <span>PDF generated successfully</span>
+          <span>PDF generated: ${filename}</span>
         </div>
         <div class="result-actions">
-          <a href="${downloadUrl}" class="btn-download" download>
+          <a href="${downloadUrl}" class="btn-download" download="${filename}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>

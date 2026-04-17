@@ -23,13 +23,14 @@ export async function jobRoutes(app: FastifyInstance): Promise<void> {
 
     // Send existing progress lines
     for (const msg of job.progress) {
-      reply.raw.write(`data: ${JSON.stringify({ message: msg, status: job.status })}\n\n`);
+      reply.raw.write(`event: progress\ndata: ${JSON.stringify({ message: msg, status: job.status })}\n\n`);
     }
 
     // If the job is already terminal, close immediately
     if (job.status === 'completed' || job.status === 'failed') {
+      const eventName = job.status === 'completed' ? 'complete' : 'error';
       reply.raw.write(
-        `data: ${JSON.stringify({ status: job.status, outputPath: job.outputPath, error: job.error })}\n\n`,
+        `event: ${eventName}\ndata: ${JSON.stringify({ status: job.status, jobId: id, displayFilename: job.displayFilename, outputPath: job.outputPath, error: job.error })}\n\n`,
       );
       reply.raw.end();
       return;
@@ -39,14 +40,15 @@ export async function jobRoutes(app: FastifyInstance): Promise<void> {
     const offProgress = onProgress(id, (msg: string) => {
       const current = getJob(id);
       reply.raw.write(
-        `data: ${JSON.stringify({ message: msg, status: current?.status })}\n\n`,
+        `event: progress\ndata: ${JSON.stringify({ message: msg, status: current?.status })}\n\n`,
       );
     });
 
     const offDone = onDone(id, () => {
       const final = getJob(id);
+      const eventName = final?.status === 'completed' ? 'complete' : 'error';
       reply.raw.write(
-        `data: ${JSON.stringify({ status: final?.status, outputPath: final?.outputPath, error: final?.error })}\n\n`,
+        `event: ${eventName}\ndata: ${JSON.stringify({ status: final?.status, jobId: id, displayFilename: final?.displayFilename, outputPath: final?.outputPath, error: final?.error })}\n\n`,
       );
       cleanup();
       reply.raw.end();
@@ -77,7 +79,7 @@ export async function jobRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(404).send({ error: 'Output file not found' });
     }
 
-    const filename = path.basename(filePath);
+    const filename = job.displayFilename || path.basename(filePath);
     reply.header('Content-Type', 'application/pdf');
     reply.header('Content-Disposition', `attachment; filename="${filename}"`);
 

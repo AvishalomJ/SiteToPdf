@@ -21,7 +21,8 @@ interface SingleBody {
 }
 
 interface CrawlBody {
-  url: string;
+  url?: string;
+  startUrl?: string;
   format?: 'A4' | 'Letter';
   compress?: boolean;
   maxDepth?: number;
@@ -40,6 +41,23 @@ function getTempDir(): string {
   const fs = require('fs');
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return dir;
+}
+
+/**
+ * Convert a URL to a short, filesystem-friendly slug.
+ */
+function urlToSlug(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const raw = (parsed.hostname + parsed.pathname)
+      .replace(/[.\/_]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .toLowerCase();
+    return raw.slice(0, 60) || 'output';
+  } catch {
+    return 'output';
+  }
 }
 
 /**
@@ -79,14 +97,15 @@ export async function convertRoutes(app: FastifyInstance): Promise<void> {
         updateProgress(jobId, `Starting single-URL conversion: ${url}`);
 
         const { runSingleUrl, shutdown } = require(pipelinePath);
+        const slug = urlToSlug(url);
         const outputPath =
-          output || path.join(getTempDir(), `${jobId}.pdf`);
+          output || path.join(getTempDir(), `${slug}-${jobId.slice(0,8)}.pdf`);
 
         const result = await withConsoleCapture(jobId, () =>
           runSingleUrl({ url, format, compress, output: outputPath }),
         );
         await shutdown();
-        completeJob(jobId, result);
+        completeJob(jobId, result, `${slug}.pdf`);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         failJob(jobId, msg);
@@ -102,8 +121,9 @@ export async function convertRoutes(app: FastifyInstance): Promise<void> {
 
   /** POST /api/convert/crawl — crawl a site and generate a combined PDF */
   app.post<{ Body: CrawlBody }>('/api/convert/crawl', async (request, reply) => {
-    const { url, format, compress, maxDepth, maxPages, delay } = request.body;
-    if (!url) return reply.code(400).send({ error: 'url is required' });
+    const { url, startUrl, format, compress, maxDepth, maxPages, delay } = request.body;
+    const actualUrl = url || startUrl;
+    if (!actualUrl) return reply.code(400).send({ error: 'url or startUrl is required' });
 
     const jobId = createJob();
     reply.send({ jobId });
@@ -111,14 +131,15 @@ export async function convertRoutes(app: FastifyInstance): Promise<void> {
     setImmediate(async () => {
       try {
         await pool.acquire();
-        updateProgress(jobId, `Starting crawl: ${url}`);
+        updateProgress(jobId, `Starting crawl: ${actualUrl}`);
 
         const { runCrawl, shutdown } = require(pipelinePath);
-        const outputPath = path.join(getTempDir(), `${jobId}.pdf`);
+        const slug = urlToSlug(actualUrl);
+        const outputPath = path.join(getTempDir(), `${slug}-${jobId.slice(0,8)}.pdf`);
 
         const result = await withConsoleCapture(jobId, () =>
           runCrawl({
-            url,
+            url: actualUrl,
             format,
             compress,
             depth: maxDepth,
@@ -128,7 +149,7 @@ export async function convertRoutes(app: FastifyInstance): Promise<void> {
           }),
         );
         await shutdown();
-        completeJob(jobId, result);
+        completeJob(jobId, result, `${slug}.pdf`);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         failJob(jobId, msg);
@@ -158,13 +179,14 @@ export async function convertRoutes(app: FastifyInstance): Promise<void> {
         updateProgress(jobId, `Starting list conversion: ${urls.length} URL(s)`);
 
         const { runList, shutdown } = require(pipelinePath);
-        const outputPath = path.join(getTempDir(), `${jobId}.pdf`);
+        const slug = urls.length > 0 ? urlToSlug(urls[0]) : 'multi-site';
+        const outputPath = path.join(getTempDir(), `${slug}-combined-${jobId.slice(0,8)}.pdf`);
 
         const result = await withConsoleCapture(jobId, () =>
           runList({ urls, format, compress, output: outputPath }),
         );
         await shutdown();
-        completeJob(jobId, result);
+        completeJob(jobId, result, `${slug}-combined.pdf`);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         failJob(jobId, msg);

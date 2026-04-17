@@ -8,6 +8,7 @@ export interface Job {
   status: JobStatus;
   progress: string[];
   outputPath?: string;
+  displayFilename?: string;
   error?: string;
   createdAt: number;
 }
@@ -47,11 +48,12 @@ export function updateProgress(jobId: string, message: string): void {
   emitter.emit(`progress:${jobId}`, message);
 }
 
-export function completeJob(jobId: string, outputPath: string): void {
+export function completeJob(jobId: string, outputPath: string, displayFilename?: string): void {
   const job = jobs.get(jobId);
   if (!job) return;
   job.status = 'completed';
   job.outputPath = outputPath;
+  if (displayFilename) job.displayFilename = displayFilename;
   emitter.emit(`progress:${jobId}`, `✅ Done — ${outputPath}`);
   emitter.emit(`done:${jobId}`);
 }

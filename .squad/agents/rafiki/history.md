@@ -169,3 +169,75 @@
 - `web/frontend/styles.css`: `.btn-gmail` class with Gmail red (`#ea4335`).
 
 **Key paths modified:** `src/extractor.ts`, `web/frontend/app.js`, `web/frontend/styles.css`, `electron/renderer/app.js`
+
+### 2026-04-17 — Web frontend UI enhancements (7 features)
+
+**Context:** Completed comprehensive web frontend UI improvements across all 7 requested items — F1 (loading overlay), F2 (logo/favicon), F3 (readable filename display), F4 (improved Gmail compose), FT1 (two-level nav structure), FT2 (image-to-PDF UI), and visibility updates.
+
+**Implementation:**
+
+**F1 — Loading Overlay:**
+- `setConverting()` function now adds/removes `.converting` class on `.form-card` element
+- CSS: `.form-card.converting` disables pointer events, reduces opacity to 0.7, and shows animated progress bar via `::before` pseudo-element
+- Progress bar uses sliding gradient animation (`progress-slide` keyframe: translateX -100% to 100%, 1.5s duration)
+- Visual feedback is immediate and non-intrusive during conversion
+
+**F2 — Logo & Favicon:**
+- Replaced inline SVG header icon (document with download arrow) with cleaner, PDF-themed icon using stroke-width 1.8
+- Created `web/frontend/favicon.svg` with filled light blue background (#e0e7ff) and blue stroke (#3b82f6)
+- Added `<link rel="icon" type="image/svg+xml" href="favicon.svg">` to `<head>`
+- Maintains gradient header styling, improves brand consistency
+
+**F3 — Readable Filename Display:**
+- Updated `showResult()` to handle both string jobId and object `{ jobId, displayFilename }`
+- Success message now shows "✅ PDF generated: {filename}" with the readable filename
+- Filename uses `displayFilename` from SSE complete event if available, otherwise falls back to `SiteToPdf-{jobId}.pdf`
+- Download link uses `download="${filename}"` attribute for browser-friendly filename
+- SSE `connectJobSSE()` already passes through complete event data properly
+
+**F4 — Improved Gmail Compose:**
+- Gmail subject: `SiteToPdf: {filename}` (uses readable filename from F3)
+- Gmail body updated to friendly, professional template mentioning the filename explicitly
+- Removed download URL from body (ephemeral and would be dead by email send time)
+- Body includes note: "PDF file needs to be attached manually after opening this email draft"
+- Button remains styled with Gmail red (#ea4335)
+
+**FT1 — Two-Level Navigation:**
+- Added nav-tab system: "Convert" and "Tools" top-level groups
+- Convert group contains: Single URL, Crawl Site, URL List
+- Tools group contains: Merge PDFs, Summarize, Image → PDF
+- Nav tabs styled with bottom border indicator (2px solid primary when active)
+- Mode buttons now grouped under `#convertModes` and `#toolsModes` divs (one visible at a time)
+- Nav tab switching logic switches visible mode-selector div and auto-selects first mode in new group if needed
+- `updateModeButtons()` helper function keeps mode buttons in sync across both groups
+- CSS: `.nav-tabs` flex container with border-bottom, `.nav-tab` uses icon + text layout with active state styling
+
+**FT2 — Image to PDF UI:**
+- Added `#imageSection` in HTML with file input (accept: image/png,image/jpeg), "Add Images" button, and file list display
+- Image file list reuses `.merge-file-list` CSS classes (consistent with merge UI)
+- State: `imageFiles` array stores File objects
+- File handling: deduplication by name + size, drag-to-reorder with up/down buttons, remove button
+- `renderImageFileList()` displays numbered list with filename, file size, and action buttons
+- `handleImageToPdf()` function:
+  - Validates at least 1 image selected
+  - Creates FormData and appends all files with key `images`
+  - POSTs to `/api/convert/images-to-pdf`
+  - Receives jobId, connects SSE, shows result
+- Form submit handler checks `currentMode === 'imagetopdf'` and calls `handleImageToPdf()`
+- `updateVisibleSections()` handles `imagetopdf` case: shows imageSection, hides format/compress groups, sets button text "Convert to PDF"
+
+**Visibility & UI Polish:**
+- `updateVisibleSections()` extended to hide `imageSection` by default, show it when `imagetopdf` mode active
+- Loading overlay works seamlessly with form disabling during all async operations
+- Nav tab icons use Feather-style line icons (document for Convert, settings gear for Tools)
+- All modes properly toggle visibility of sections and options based on context
+
+**Key files modified:** `web/frontend/index.html`, `web/frontend/styles.css`, `web/frontend/app.js`, `web/frontend/favicon.svg` (NEW)
+
+**Key design choices:**
+- Two-level nav uses CSS border-bottom for active state (cleaner than background highlighting)
+- Image-to-PDF reuses merge file list CSS for UI consistency
+- Loading overlay is purely CSS-driven (no spinner DOM elements), relies on form-card positioning
+- Filename display logic gracefully degrades if server doesn't send displayFilename
+- Gmail body is user-friendly and acknowledges the manual attachment step required for web
+

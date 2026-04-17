@@ -201,3 +201,43 @@
   - Server has its own `tsconfig.json` with `outDir: ../../dist/web/server` — separate from root tsconfig.
   - No existing files modified — purely additive.
 - **Build verification:** Root `npm run build` ✓, server `npx tsc` ✓, Aspire `dotnet build` ✓.
+
+### SSE Named Events Fix — "Connection to server lost" bug
+
+- **Bug:** Server sent unnamed SSE events (`data: ...\n\n`), but frontend `EventSource` listened for named events (`progress`, `complete`, `error`). Unnamed events dispatch as `message` events — the named listeners never fired, so the connection would close and the client showed "Connection to server lost".
+- **Fix:** Added `event: progress\n`, `event: complete\n`, or `event: error\n` prefixes before each `data:` line in `web/server/routes/jobs.ts`. Four write points updated: existing progress replay, terminal-state-on-connect, live progress callback, and done callback.
+- **SSE spec pattern:** Named events require `event: {name}\ndata: {payload}\n\n`. Without the `event:` line, browsers fire the generic `message` event, not the named one. This is a common SSE mismatch bug.
+- **File changed:** `web/server/routes/jobs.ts` — all 4 `reply.raw.write()` calls in the SSE endpoint.
+- **Build verified:** `npx tsc --project tsconfig.json` ✓, compiled output at `dist/web/server/routes/jobs.js` confirmed with `event:` prefixes.
+
+### 2026-04-XX — Backend Fixes and Image-to-PDF Endpoint
+
+- **Crawl bug fix:** Server route for /api/convert/crawl now accepts both url and startUrl parameters. Frontend sends startUrl, but now the server destructures both and uses url || startUrl for backward compatibility.
+- **Readable filenames (F3):**
+  - Added displayFilename?: string field to Job interface in job-manager.ts.
+  - Updated completeJob() to accept optional displayFilename parameter.
+  - Added urlToSlug() helper in convert.ts — converts URL (hostname + pathname) to filesystem-friendly slug, 60 chars max.
+  - All three conversion routes (single, crawl, list) now generate readable filenames:
+    - Single: {slug}-{jobId-8chars}.pdf on disk, {slug}.pdf as displayFilename
+    - Crawl: {slug}-{jobId-8chars}.pdf on disk, {slug}.pdf as displayFilename
+    - List: {slug}-combined-{jobId-8chars}.pdf on disk, {slug}-combined.pdf as displayFilename
+  - SSE complete events now include jobId and displayFilename in JSON payload.
+  - Download endpoint (/api/jobs/:id/download) uses displayFilename (if available) in Content-Disposition header instead of raw temp filename.
+- **PDF formatting fix (F5):**
+  - Root cause: SSE complete event was sending outputPath but not jobId, so frontend could not construct download URL.
+  - Fix: Both SSE completion paths (terminal state on connect, and live done callback) now include jobId in the JSON payload.
+  - Added file existence check in download endpoint — returns 404 error if file is missing (instead of crashing).
+- **Image-to-PDF endpoint (FT2):**
+  - Installed @fastify/multipart in web/server/package.json.
+  - Registered multipart plugin in server.ts with limits: max 50 files, 20MB per file.
+  - New route file: web/server/routes/images.ts with POST /api/convert/images-to-pdf.
+  - Endpoint accepts multipart file uploads, validates MIME types (image/png, image/jpeg, image/jpg).
+  - Uses pdf-lib (from root dependencies) to create a PDF with one page per image, sized to image dimensions.
+  - Returns jobId immediately, runs asynchronously, saves to temp dir as images-{jobId-8chars}.pdf.
+  - Follows same job-based pattern as other conversion routes.
+- **Build verification:** Root npm run build verified, server npx tsc verified, no TypeScript errors.
+- **Key patterns:**
+  - urlToSlug() reuses the same logic as pipeline generateOutputFilename() but returns just the slug part (no .pdf extension, no suffixes).
+  - JobId suffix in disk filenames prevents collisions, while displayFilename gives users clean download names.
+  - SSE events must include jobId so frontend can construct download URLs — the outputPath is server-side only.
+
