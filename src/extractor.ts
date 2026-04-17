@@ -309,6 +309,16 @@ export function extractContent(html: string, baseUrl?: string): ExtractedContent
   // Locate main content
   const $content = findMainContent($);
 
+  // Remove the first <h1> from content if it matches the extracted title
+  // (pdf-generator adds its own styled <h1>, so this prevents duplication)
+  const $firstH1 = $content.find('h1').first();
+  if ($firstH1.length && title) {
+    const h1Text = $firstH1.text().trim();
+    if (h1Text.toLowerCase() === title.toLowerCase()) {
+      $firstH1.remove();
+    }
+  }
+
   // Post-processing cleanup
   removeEmptyElements($, $content);
   stripNoisyAttributes($, $content);

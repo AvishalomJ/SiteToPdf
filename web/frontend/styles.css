@@ -386,6 +386,14 @@ input:checked + .toggle-slider:before {
   height: 16px;
 }
 
+.btn-gmail {
+  background: #ea4335 !important;
+}
+
+.btn-gmail:hover {
+  background: #d33426 !important;
+}
+
 /* Progress Card */
 .progress-card {
   background: var(--color-card);
