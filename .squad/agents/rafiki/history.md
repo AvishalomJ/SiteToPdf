@@ -155,3 +155,17 @@
 - Merge endpoint marked as Phase 2 TODO — frontend code is ready, waiting for Simba's backend
 - API key client-side validation: summarize mode checks for key before making the API call
 - SSE connection is tracked in `activeEventSource` and properly cleaned up between jobs
+
+### 2026-04-17 — Duplicate title fix & Gmail button
+
+**Duplicate h1 fix (extractor.ts):**
+- After `findMainContent()`, the extractor now checks the first `<h1>` inside content. If its text matches the extracted title (case-insensitive), it removes that `<h1>`.
+- This prevents double-title in PDFs since `pdf-generator.ts` already adds a styled `<h1>` in `wrapInHtmlDocument()` (line ~474) and `wrapMultiPageDocument()` (line ~523).
+- Safe: only removes if text actually matches, so non-title h1 elements are preserved.
+
+**Gmail button (web + electron):**
+- `web/frontend/app.js` `showResult()`: Added "Send via Gmail" link using `mailto`-style Gmail compose URL (`mail.google.com/mail/?view=cm`). Body includes the full download link since Gmail can't programmatically attach files.
+- `electron/renderer/app.js` `showResult()`: Added "Send via Gmail" button using `window.open()` (preload API has no `openExternal`, so standard `window.open` suffices). Body includes the local file path for manual attachment.
+- `web/frontend/styles.css`: `.btn-gmail` class with Gmail red (`#ea4335`).
+
+**Key paths modified:** `src/extractor.ts`, `web/frontend/app.js`, `web/frontend/styles.css`, `electron/renderer/app.js`
