@@ -5,6 +5,10 @@ let defaultOutputDir = '';
 let mergeFiles = [];
 let imageFiles = [];
 
+// Merge group constants
+const MERGE_GROUP_COLORS = { A: '#3b82f6', B: '#10b981', C: '#f59e0b', D: '#8b5cf6', E: '#ef4444' };
+const MERGE_GROUPS = Object.keys(MERGE_GROUP_COLORS);
+
 // Elements
 const form = document.getElementById('convertForm');
 const modeButtons = document.querySelectorAll('.mode-btn');
@@ -188,8 +192,8 @@ addPdfFilesBtn.addEventListener('click', async () => {
   if (paths && paths.length > 0) {
     // Deduplicate
     paths.forEach(p => {
-      if (!mergeFiles.includes(p)) {
-        mergeFiles.push(p);
+      if (!mergeFiles.some(f => f.path === p)) {
+        mergeFiles.push({ path: p, group: 'A' });
       }
     });
     renderMergeFileList();
@@ -201,13 +205,27 @@ function renderMergeFileList() {
     mergeFileList.innerHTML = '<div class="merge-empty-state">No PDF files selected. Click "Add PDF Files" to begin.</div>';
     return;
   }
-  mergeFileList.innerHTML = mergeFiles.map((filePath, index) => {
-    const filename = filePath.split(/[\\/]/).pop();
+  const groupOptions = MERGE_GROUPS.map(g => `<option value="${g}">Group ${g}</option>`).join('');
+
+  mergeFileList.innerHTML = mergeFiles.map((entry, index) => {
+    const color = MERGE_GROUP_COLORS[entry.group] || MERGE_GROUP_COLORS.A;
+    const name = entry.path.split(/[\\/]/).pop();
     return `
-      <div class="merge-file-item" data-index="${index}">
-        <span class="merge-file-number">${index + 1}.</span>
-        <span class="merge-file-name" title="${filePath}">${filename}</span>
-        <div class="merge-file-actions">
+      <div class="file-preview-card" data-index="${index}" style="border-color: ${color}">
+        <div class="file-preview-thumb">
+          <svg class="pdf-icon" width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <rect x="8" y="4" width="32" height="40" rx="3" fill="${color}" opacity="0.15" stroke="${color}" stroke-width="1.5"/>
+            <path d="M24 4V16h12" stroke="${color}" stroke-width="1.5" fill="none"/>
+            <text x="24" y="32" text-anchor="middle" font-size="10" font-weight="bold" fill="${color}">PDF</text>
+          </svg>
+        </div>
+        <div class="file-preview-info">
+          <span class="file-preview-name" title="${entry.path}">${name}</span>
+        </div>
+        <select class="merge-group-select" data-index="${index}" style="border-color: ${color}; color: ${color}">
+          ${groupOptions.replace(`value="${entry.group}"`, `value="${entry.group}" selected`)}
+        </select>
+        <div class="file-preview-actions">
           <button type="button" class="merge-btn-move" data-action="up" data-index="${index}" ${index === 0 ? 'disabled' : ''} title="Move up">▲</button>
           <button type="button" class="merge-btn-move" data-action="down" data-index="${index}" ${index === mergeFiles.length - 1 ? 'disabled' : ''} title="Move down">▼</button>
           <button type="button" class="merge-btn-remove" data-index="${index}" title="Remove">✕</button>
@@ -235,6 +253,14 @@ function renderMergeFileList() {
     btn.addEventListener('click', () => {
       const i = parseInt(btn.dataset.index);
       mergeFiles.splice(i, 1);
+      renderMergeFileList();
+    });
+  });
+
+  mergeFileList.querySelectorAll('.merge-group-select').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const i = parseInt(sel.dataset.index);
+      mergeFiles[i].group = sel.value;
       renderMergeFileList();
     });
   });
@@ -268,14 +294,16 @@ function renderImageFileList() {
   }
   imageFileList.innerHTML = imageFiles.map((filePath, index) => {
     const filename = filePath.split(/[\\/]/).pop();
-    // Create a thumbnail using a file:// URL (Electron has local file access)
     const thumbnailSrc = 'file:///' + filePath.replace(/\\/g, '/');
     return `
-      <div class="merge-file-item" data-index="${index}">
-        <img class="image-thumbnail" src="${thumbnailSrc}" alt="${filename}" />
-        <span class="merge-file-number">${index + 1}.</span>
-        <span class="merge-file-name" title="${filePath}">${filename}</span>
-        <div class="merge-file-actions">
+      <div class="file-preview-card" data-index="${index}">
+        <div class="file-preview-thumb">
+          <img class="image-thumbnail" src="${thumbnailSrc}" alt="${filename}" />
+        </div>
+        <div class="file-preview-info">
+          <span class="file-preview-name" title="${filePath}">${filename}</span>
+        </div>
+        <div class="file-preview-actions">
           <button type="button" class="merge-btn-move" data-action="up" data-index="${index}" ${index === 0 ? 'disabled' : ''} title="Move up">▲</button>
           <button type="button" class="merge-btn-move" data-action="down" data-index="${index}" ${index === imageFiles.length - 1 ? 'disabled' : ''} title="Move down">▼</button>
           <button type="button" class="merge-btn-remove" data-index="${index}" title="Remove">✕</button>
@@ -465,8 +493,17 @@ async function handleMerge() {
   document.getElementById('progressCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   try {
+    // Build groups from mergeFiles entries
+    const groups = {};
+    mergeFiles.forEach(entry => {
+      const g = entry.group || 'A';
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(entry.path);
+    });
+
     const result = await window.siteToPdf.mergePdfs({
-      files: mergeFiles,
+      files: mergeFiles.map(f => f.path),
+      groups,
       outputPath: outputPath.value || undefined,
     });
 

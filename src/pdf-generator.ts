@@ -432,8 +432,8 @@ function buildRtlStyles(compress = false): string {
 const HEADER_FOOTER_BASE_STYLE =
   'font-family: Arial, "Segoe UI", sans-serif; font-size: 9px; color: #999; width: 100%; padding: 0 18mm;';
 
-function buildHeaderTemplate(title?: string, compress = false, rtl = false): string {
-  const left = title ? escapeHtml(truncate(title, 60)) : '';
+function buildHeaderTemplate(title?: string, compress = false, rtl = false, showTitle = true): string {
+  const left = showTitle && title ? escapeHtml(truncate(title, 60)) : '';
   const fontSize = compress ? '8px' : '10px';
   const direction = rtl ? 'direction: rtl;' : '';
   return `<div style="font-size: ${fontSize}; font-family: Arial, sans-serif; color: #999; width: 100%; display: flex; justify-content: space-between; padding: 0 20px; ${direction}">
@@ -608,7 +608,7 @@ export async function generatePdf(
       format: options.format ?? 'A4',
       printBackground: true,
       displayHeaderFooter: true,
-      headerTemplate: buildHeaderTemplate(options.title ?? content.title, compress, rtl),
+      headerTemplate: buildHeaderTemplate(options.title ?? content.title, compress, rtl, false),
       footerTemplate: buildFooterTemplate(compress, rtl),
       margin: compress
         ? { top: '15mm', right: '12mm', bottom: '15mm', left: '12mm' }

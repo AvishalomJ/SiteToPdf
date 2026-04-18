@@ -9,6 +9,7 @@ import { convertRoutes } from './routes/convert';
 import { summarizeRoutes } from './routes/summarize';
 import { jobRoutes } from './routes/jobs';
 import { imageRoutes } from './routes/images';
+import { mergeRoutes } from './routes/merge';
 
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
 
@@ -41,6 +42,7 @@ async function start(): Promise<void> {
   await app.register(summarizeRoutes);
   await app.register(jobRoutes);
   await app.register(imageRoutes);
+  await app.register(mergeRoutes);
 
   await app.listen({ port: PORT, host: '0.0.0.0' });
   console.log(`🚀 SiteToPdf API server listening on http://0.0.0.0:${PORT}`);

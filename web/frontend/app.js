@@ -9,7 +9,7 @@ const LS_MODEL = 'sitetopdf_gemini_model';
 let currentMode = 'single';
 let isConverting = false;
 let activeEventSource = null;
-let mergeFiles = []; // { file: File, name: string }
+let mergeFiles = []; // { file: File, name: string, group: string }
 let imageFiles = []; // Array of File objects
 let imageObjectUrls = []; // Corresponding object URLs for thumbnails
 
@@ -186,7 +186,7 @@ pdfFileInput.addEventListener('change', () => {
     // Deduplicate by name + size
     const isDup = mergeFiles.some(f => f.name === file.name && f.file.size === file.size);
     if (!isDup) {
-      mergeFiles.push({ file, name: file.name });
+      mergeFiles.push({ file, name: file.name, group: 'A' });
     }
   });
   pdfFileInput.value = '';
@@ -199,18 +199,36 @@ function formatFileSize(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
+const MERGE_GROUP_COLORS = { A: '#3b82f6', B: '#10b981', C: '#f59e0b', D: '#8b5cf6', E: '#ef4444' };
+const MERGE_GROUPS = Object.keys(MERGE_GROUP_COLORS);
+
 function renderMergeFileList() {
   if (mergeFiles.length === 0) {
     mergeFileList.innerHTML = '<div class="merge-empty-state">No PDF files selected. Click "Add PDF Files" to begin.</div>';
     return;
   }
+
+  const groupOptions = MERGE_GROUPS.map(g => `<option value="${g}">Group ${g}</option>`).join('');
+
   mergeFileList.innerHTML = mergeFiles.map((entry, index) => {
+    const color = MERGE_GROUP_COLORS[entry.group] || MERGE_GROUP_COLORS.A;
     return `
-      <div class="merge-file-item" data-index="${index}">
-        <span class="merge-file-number">${index + 1}.</span>
-        <span class="merge-file-name" title="${entry.name}">${entry.name}</span>
-        <span class="merge-file-size">${formatFileSize(entry.file.size)}</span>
-        <div class="merge-file-actions">
+      <div class="file-preview-card" data-index="${index}" style="border-color: ${color}">
+        <div class="file-preview-thumb">
+          <svg class="pdf-icon" width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <rect x="8" y="4" width="32" height="40" rx="3" fill="${color}" opacity="0.15" stroke="${color}" stroke-width="1.5"/>
+            <path d="M24 4V16h12" stroke="${color}" stroke-width="1.5" fill="none"/>
+            <text x="24" y="32" text-anchor="middle" font-size="10" font-weight="bold" fill="${color}">PDF</text>
+          </svg>
+        </div>
+        <div class="file-preview-info">
+          <span class="file-preview-name" title="${entry.name}">${entry.name}</span>
+          <span class="file-preview-size">${formatFileSize(entry.file.size)}</span>
+        </div>
+        <select class="merge-group-select" data-index="${index}" style="border-color: ${color}; color: ${color}">
+          ${groupOptions.replace(`value="${entry.group}"`, `value="${entry.group}" selected`)}
+        </select>
+        <div class="file-preview-actions">
           <button type="button" class="merge-btn-move" data-action="up" data-index="${index}" ${index === 0 ? 'disabled' : ''} title="Move up">▲</button>
           <button type="button" class="merge-btn-move" data-action="down" data-index="${index}" ${index === mergeFiles.length - 1 ? 'disabled' : ''} title="Move down">▼</button>
           <button type="button" class="merge-btn-remove" data-index="${index}" title="Remove">✕</button>
@@ -237,6 +255,14 @@ function renderMergeFileList() {
     btn.addEventListener('click', () => {
       const i = parseInt(btn.dataset.index);
       mergeFiles.splice(i, 1);
+      renderMergeFileList();
+    });
+  });
+
+  mergeFileList.querySelectorAll('.merge-group-select').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const i = parseInt(sel.dataset.index);
+      mergeFiles[i].group = sel.value;
       renderMergeFileList();
     });
   });
@@ -277,12 +303,15 @@ function renderImageFileList() {
 
   imageFileList.innerHTML = imageFiles.map((file, index) => {
     return `
-      <div class="merge-file-item" data-index="${index}">
-        <span class="merge-file-number">${index + 1}.</span>
-        <img class="image-thumbnail" src="${imageObjectUrls[index]}" alt="${file.name}">
-        <span class="merge-file-name" title="${file.name}">${file.name}</span>
-        <span class="merge-file-size">${formatFileSize(file.size)}</span>
-        <div class="merge-file-actions">
+      <div class="file-preview-card" data-index="${index}">
+        <div class="file-preview-thumb">
+          <img class="image-thumbnail" src="${imageObjectUrls[index]}" alt="${file.name}">
+        </div>
+        <div class="file-preview-info">
+          <span class="file-preview-name" title="${file.name}">${file.name}</span>
+          <span class="file-preview-size">${formatFileSize(file.size)}</span>
+        </div>
+        <div class="file-preview-actions">
           <button type="button" class="merge-btn-move" data-action="up" data-index="${index}" ${index === 0 ? 'disabled' : ''} title="Move up">▲</button>
           <button type="button" class="merge-btn-move" data-action="down" data-index="${index}" ${index === imageFiles.length - 1 ? 'disabled' : ''} title="Move down">▼</button>
           <button type="button" class="merge-btn-remove" data-index="${index}" title="Remove">✕</button>
@@ -544,35 +573,58 @@ async function handleImageToPdf() {
 }
 
 // ── Merge Handler ──
-// TODO: The /api/merge endpoint is Phase 2 — Simba will implement it.
-// This frontend code is ready and will work once the endpoint exists.
 async function handleMerge() {
   if (mergeFiles.length < 2) {
     addLogEntry('Please select at least 2 PDF files to merge', 'error');
     return;
   }
 
+  // Build groups from file assignments
+  const groupMap = {};
+  mergeFiles.forEach(entry => {
+    if (!groupMap[entry.group]) groupMap[entry.group] = [];
+    groupMap[entry.group].push(entry);
+  });
+
+  // Validate each group has at least 2 files
+  const activeGroups = Object.entries(groupMap).filter(([, files]) => files.length >= 2);
+  const singleFileGroups = Object.entries(groupMap).filter(([, files]) => files.length === 1);
+
+  if (activeGroups.length === 0) {
+    addLogEntry('Each merge group needs at least 2 files. Assign files to groups using the dropdown.', 'error');
+    return;
+  }
+  if (singleFileGroups.length > 0) {
+    const names = singleFileGroups.map(([g]) => `Group ${g}`).join(', ');
+    addLogEntry(`⚠️ Skipping ${names} (need 2+ files per group)`, 'warning');
+  }
+
   setConverting(true);
-  addLogEntry(`Merging ${mergeFiles.length} PDF files...`, 'info');
+  addLogEntry(`Merging ${mergeFiles.length} files in ${activeGroups.length} group(s)...`, 'info');
   document.getElementById('progressCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   try {
-    // Read all files as base64
-    const filesData = await Promise.all(
-      mergeFiles.map(entry => {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const base64 = reader.result.split(',')[1]; // strip data:...;base64, prefix
-            resolve({ name: entry.name, data: base64 });
-          };
-          reader.onerror = () => reject(new Error(`Failed to read ${entry.name}`));
-          reader.readAsDataURL(entry.file);
-        });
+    // Read all files as base64 and build groups payload
+    const groups = await Promise.all(
+      activeGroups.map(async ([groupName, entries]) => {
+        const files = await Promise.all(
+          entries.map(entry => {
+            return new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                const base64 = reader.result.split(',')[1];
+                resolve({ name: entry.name, data: base64 });
+              };
+              reader.onerror = () => reject(new Error(`Failed to read ${entry.name}`));
+              reader.readAsDataURL(entry.file);
+            });
+          })
+        );
+        return { groupName, files };
       })
     );
 
-    const { jobId } = await postJSON('/api/merge', { files: filesData });
+    const { jobId } = await postJSON('/api/merge', { groups });
     addLogEntry(`Merge job started: ${jobId}`, 'info');
 
     const result = await connectJobSSE(jobId);
