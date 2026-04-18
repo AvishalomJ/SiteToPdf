@@ -13,7 +13,7 @@ import { mergeRoutes } from './routes/merge';
 
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
 
-const app = Fastify({ logger: true });
+const app = Fastify({ logger: true, bodyLimit: 100 * 1024 * 1024 }); // 100MB for merge payloads
 
 async function start(): Promise<void> {
   // CORS — allow any origin in dev

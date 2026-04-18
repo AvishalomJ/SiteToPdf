@@ -501,8 +501,7 @@ function wrapInHtmlDocument(content: ExtractedContent, sourceUrl?: string, compr
   <title>${escapeHtml(content.title)}</title>
   <style>${styles}</style>
 </head>
-<body>
-  <h1>${escapeHtml(content.title)}</h1>${originalTitleHtml}
+<body>${originalTitleHtml}
   <div class="meta-block">${metaParts.join('<br>')}</div>
   ${content.contentHtml}
 </body>
@@ -608,7 +607,7 @@ export async function generatePdf(
       format: options.format ?? 'A4',
       printBackground: true,
       displayHeaderFooter: true,
-      headerTemplate: buildHeaderTemplate(options.title ?? content.title, compress, rtl, false),
+      headerTemplate: buildHeaderTemplate(options.title ?? content.title, compress, rtl),
       footerTemplate: buildFooterTemplate(compress, rtl),
       margin: compress
         ? { top: '15mm', right: '12mm', bottom: '15mm', left: '12mm' }
