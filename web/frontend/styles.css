@@ -459,6 +459,41 @@ input:checked + .toggle-slider:before {
   background: #d33426 !important;
 }
 
+.btn-whatsapp {
+  background: #25D366 !important;
+}
+
+.btn-whatsapp:hover {
+  background: #1da851 !important;
+}
+
+/* Image Thumbnails */
+.image-thumbnail {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+/* Progress Loading Dot */
+.progress-loading-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  background: var(--color-primary);
+  border-radius: 50%;
+  margin-left: 0.5rem;
+  margin-right: auto;
+  animation: pulse-dot 1.4s ease-in-out infinite;
+  vertical-align: middle;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
 /* Progress Card */
 .progress-card {
   background: var(--color-card);
@@ -864,4 +899,62 @@ input:checked + .toggle-slider:before {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-secondary);
+}
+
+/* Two-column layout (FT6) */
+.layout-left,
+.layout-right {
+  min-width: 0;
+}
+
+@media (min-width: 900px) {
+  .main-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    overflow: hidden;
+  }
+
+  .layout-left,
+  .layout-right {
+    overflow-y: auto;
+    max-height: 100%;
+  }
+
+  .form-card {
+    padding: 1.25rem;
+    margin-bottom: 0;
+  }
+
+  .section {
+    margin-bottom: 1rem;
+  }
+
+  .section:last-child {
+    margin-bottom: 0;
+  }
+
+  .mode-btn {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .progress-card {
+    margin-bottom: 1rem;
+  }
+
+  .result-card {
+    margin-bottom: 1rem;
+  }
+
+  .summary-card {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 899px) {
+  .layout-left,
+  .layout-right {
+    width: 100%;
+  }
 }

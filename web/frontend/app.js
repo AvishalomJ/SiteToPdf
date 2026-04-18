@@ -11,6 +11,7 @@ let isConverting = false;
 let activeEventSource = null;
 let mergeFiles = []; // { file: File, name: string }
 let imageFiles = []; // Array of File objects
+let imageObjectUrls = []; // Corresponding object URLs for thumbnails
 
 // ── Elements ──
 const form = document.getElementById('convertForm');
@@ -51,6 +52,9 @@ const imageFileInput = document.getElementById('imageFileInput');
 const optionsSection = document.getElementById('optionsSection');
 const formatGroup = document.getElementById('formatGroup');
 const compressGroup = document.getElementById('compressGroup');
+const progressDot = document.getElementById('progressDot');
+const fontSizeGroup = document.getElementById('fontSizeGroup');
+const fontSizeSelect = document.getElementById('fontSizeSelect');
 
 // Settings elements
 const settingsBtn = document.getElementById('settingsBtn');
@@ -118,6 +122,7 @@ function updateVisibleSections() {
   summaryModelGroup.classList.add('hidden');
   mergeSection.classList.add('hidden');
   imageSection.classList.add('hidden');
+  fontSizeGroup.classList.add('hidden');
   formatGroup.classList.remove('hidden');
   compressGroup.classList.remove('hidden');
   urlInput.required = false;
@@ -126,15 +131,18 @@ function updateVisibleSections() {
   if (currentMode === 'single') {
     singleUrlSection.classList.remove('hidden');
     urlInput.required = true;
+    fontSizeGroup.classList.remove('hidden');
     btnText.textContent = 'Convert to PDF';
   } else if (currentMode === 'crawl') {
     singleUrlSection.classList.remove('hidden');
     crawlOptionsSection.classList.remove('hidden');
     urlInput.required = true;
+    fontSizeGroup.classList.remove('hidden');
     btnText.textContent = 'Convert to PDF';
   } else if (currentMode === 'list') {
     urlListSection.classList.remove('hidden');
     urlListInput.required = true;
+    fontSizeGroup.classList.remove('hidden');
     btnText.textContent = 'Convert to PDF';
   } else if (currentMode === 'summarize') {
     singleUrlSection.classList.remove('hidden');
@@ -253,14 +261,25 @@ imageFileInput.addEventListener('change', () => {
 });
 
 function renderImageFileList() {
+  // Revoke old object URLs
+  imageObjectUrls.forEach(url => URL.revokeObjectURL(url));
+  imageObjectUrls = [];
+
   if (imageFiles.length === 0) {
     imageFileList.innerHTML = '<div class="merge-empty-state">No images selected. Click "Add Images" to begin.</div>';
     return;
   }
+
+  // Create new object URLs for thumbnails
+  imageFiles.forEach(file => {
+    imageObjectUrls.push(URL.createObjectURL(file));
+  });
+
   imageFileList.innerHTML = imageFiles.map((file, index) => {
     return `
       <div class="merge-file-item" data-index="${index}">
         <span class="merge-file-number">${index + 1}.</span>
+        <img class="image-thumbnail" src="${imageObjectUrls[index]}" alt="${file.name}">
         <span class="merge-file-name" title="${file.name}">${file.name}</span>
         <span class="merge-file-size">${formatFileSize(file.size)}</span>
         <div class="merge-file-actions">
@@ -428,6 +447,7 @@ form.addEventListener('submit', async (e) => {
     const commonOptions = {
       format: formatSelect.value,
       compress: compressToggle.checked,
+      fontSize: fontSizeSelect.value,
     };
 
     let endpoint;
@@ -470,7 +490,7 @@ form.addEventListener('submit', async (e) => {
 
     // Step 3: Show result
     addLogEntry('✅ PDF generated successfully', 'success');
-    showResult(true, jobId);
+    showResult(true, result);
     playSuccessSound();
   } catch (error) {
     addLogEntry(`Error: ${error.message}`, 'error');
@@ -558,7 +578,7 @@ async function handleMerge() {
     const result = await connectJobSSE(jobId);
 
     addLogEntry('✅ PDFs merged successfully', 'success');
-    showResult(true, jobId);
+    showResult(true, result);
     playSuccessSound();
   } catch (error) {
     addLogEntry(`Error: ${error.message}`, 'error');
@@ -605,7 +625,7 @@ async function handleSummarize() {
       showSummary(result.title, result.summary);
     }
     if (result.jobId || jobId) {
-      showResult(true, result.jobId || jobId);
+      showResult(true, result);
     }
     playSuccessSound();
   } catch (error) {
@@ -642,6 +662,7 @@ function setConverting(converting) {
 
   if (converting) {
     formCard.classList.add('converting');
+    progressDot.classList.remove('hidden');
     if (currentMode === 'summarize') {
       btnText.textContent = 'Summarizing...';
     } else if (currentMode === 'merge') {
@@ -652,6 +673,7 @@ function setConverting(converting) {
     btnSpinner.classList.remove('hidden');
   } else {
     formCard.classList.remove('converting');
+    progressDot.classList.add('hidden');
     if (currentMode === 'summarize') {
       btnText.textContent = 'Summarize';
     } else if (currentMode === 'merge') {
@@ -665,6 +687,30 @@ function setConverting(converting) {
   }
 }
 
+function triggerDownloadThenGmail(downloadUrl, filename, gmailUrl) {
+  const a = document.createElement('a');
+  a.href = downloadUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => {
+    window.open(gmailUrl, '_blank', 'noopener');
+  }, 500);
+}
+
+function triggerDownloadThenWhatsApp(downloadUrl, filename, waUrl) {
+  const a = document.createElement('a');
+  a.href = downloadUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => {
+    window.open(waUrl, '_blank', 'noopener');
+  }, 500);
+}
+
 function showResult(success, data) {
   resultCard.classList.remove('hidden');
 
@@ -673,12 +719,13 @@ function showResult(success, data) {
     const jobId = typeof data === 'string' ? data : (data.jobId || data);
     const filename = (typeof data === 'object' && data.displayFilename) ? data.displayFilename : `SiteToPdf-${jobId}.pdf`;
     const downloadUrl = `/api/jobs/${jobId}/download`;
-    const fullDownloadUrl = window.location.origin + downloadUrl;
     const gmailSubject = encodeURIComponent(`SiteToPdf: ${filename}`);
     const gmailBody = encodeURIComponent(
-      `Hi,\n\nI'd like to share a PDF document with you: "${filename}"\n\nThis document was generated from a website using SiteToPdf.\n\nPlease note: The PDF file needs to be attached manually after opening this email draft.\n\nBest regards`
+      `I've attached a PDF document: ${filename}\n\nThis was generated using SiteToPdf.\n\nNote: The PDF was just downloaded to your computer. Please attach it to this email before sending.`
     );
     const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&su=${gmailSubject}&body=${gmailBody}`;
+    const waMessage = encodeURIComponent(`Check out this PDF: ${filename} - Generated with SiteToPdf`);
+    const waUrl = `https://wa.me/?text=${waMessage}`;
 
     resultContent.innerHTML = `
       <div class="result-success">
@@ -695,12 +742,22 @@ function showResult(success, data) {
             </svg>
             Download PDF
           </a>
-          <a href="${gmailUrl}" target="_blank" rel="noopener" class="btn-download btn-gmail">
+          <button type="button" class="btn-download btn-gmail" id="gmailShareBtn">
             📧 Send via Gmail
-          </a>
+          </button>
+          <button type="button" class="btn-download btn-whatsapp" id="whatsappShareBtn">
+            💬 WhatsApp
+          </button>
         </div>
       </div>
     `;
+
+    document.getElementById('gmailShareBtn').addEventListener('click', () => {
+      triggerDownloadThenGmail(downloadUrl, filename, gmailUrl);
+    });
+    document.getElementById('whatsappShareBtn').addEventListener('click', () => {
+      triggerDownloadThenWhatsApp(downloadUrl, filename, waUrl);
+    });
   } else {
     resultContent.innerHTML = `
       <div class="result-message error">

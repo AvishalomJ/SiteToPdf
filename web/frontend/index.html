@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; img-src 'self' blob:">
   <title>SiteToPdf — Web</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="styles.css">
@@ -23,7 +23,7 @@
           </svg>
           SiteToPdf
         </h1>
-        <p class="app-subtitle">Convert web pages to clean PDFs</p>
+        <p class="app-subtitle">Convert, merge &amp; transform — your all-in-one PDF toolkit</p>
       </div>
       <span class="web-badge">Web</span>
       <button id="settingsBtn" class="settings-btn" title="Settings">
@@ -37,6 +37,7 @@
 
     <!-- Main Content -->
     <main class="main-content">
+      <div class="layout-left">
       <form id="convertForm" class="form-card">
         
         <!-- Mode Selector -->
@@ -153,6 +154,16 @@
               </select>
             </div>
 
+            <!-- Font Size (visible for single, crawl, list) -->
+            <div class="option-group hidden" id="fontSizeGroup">
+              <label for="fontSizeSelect" class="option-label">Font Size</label>
+              <select id="fontSizeSelect" class="select-field">
+                <option value="small">Small</option>
+                <option value="normal" selected>Normal</option>
+                <option value="large">Large</option>
+              </select>
+            </div>
+
             <!-- Gemini Model (visible in Summarize mode only) -->
             <div class="option-group hidden" id="summaryModelGroup">
               <label for="summaryModelSelect" class="option-label">Gemini Model</label>
@@ -200,11 +211,14 @@
         </div>
 
       </form>
+      </div>
 
+      <div class="layout-right">
       <!-- Progress Area -->
       <div class="progress-card" id="progressCard">
         <div class="progress-header">
           <h3 class="progress-title">Progress</h3>
+          <span class="progress-loading-dot hidden" id="progressDot"></span>
           <button type="button" id="clearLogBtn" class="btn-text-only">Clear</button>
         </div>
         <div class="progress-log" id="progressLog">
@@ -224,6 +238,7 @@
           <button type="button" id="closeSummaryBtn" class="btn-text-only">Close</button>
         </div>
         <div class="summary-body" id="summaryBody"></div>
+      </div>
       </div>
 
     </main>
