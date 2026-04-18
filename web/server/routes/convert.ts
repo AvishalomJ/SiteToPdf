@@ -17,6 +17,7 @@ interface SingleBody {
   url: string;
   format?: 'A4' | 'Letter';
   compress?: boolean;
+  fontSize?: 'small' | 'normal' | 'large';
   output?: string;
 }
 
@@ -25,6 +26,7 @@ interface CrawlBody {
   startUrl?: string;
   format?: 'A4' | 'Letter';
   compress?: boolean;
+  fontSize?: 'small' | 'normal' | 'large';
   maxDepth?: number;
   maxPages?: number;
   delay?: number;
@@ -34,6 +36,7 @@ interface ListBody {
   urls: string[];
   format?: 'A4' | 'Letter';
   compress?: boolean;
+  fontSize?: 'small' | 'normal' | 'large';
 }
 
 function getTempDir(): string {
@@ -84,7 +87,7 @@ function withConsoleCapture(jobId: string, fn: () => Promise<string>): Promise<s
 export async function convertRoutes(app: FastifyInstance): Promise<void> {
   /** POST /api/convert/single — convert a single URL to PDF */
   app.post<{ Body: SingleBody }>('/api/convert/single', async (request, reply) => {
-    const { url, format, compress, output } = request.body;
+    const { url, format, compress, fontSize, output } = request.body;
     if (!url) return reply.code(400).send({ error: 'url is required' });
 
     const jobId = createJob();
@@ -102,7 +105,7 @@ export async function convertRoutes(app: FastifyInstance): Promise<void> {
           output || path.join(getTempDir(), `${slug}-${jobId.slice(0,8)}.pdf`);
 
         const result = await withConsoleCapture(jobId, () =>
-          runSingleUrl({ url, format, compress, output: outputPath }),
+          runSingleUrl({ url, format, compress, fontSize, output: outputPath }),
         );
         await shutdown();
         completeJob(jobId, result, `${slug}.pdf`);
@@ -121,7 +124,7 @@ export async function convertRoutes(app: FastifyInstance): Promise<void> {
 
   /** POST /api/convert/crawl — crawl a site and generate a combined PDF */
   app.post<{ Body: CrawlBody }>('/api/convert/crawl', async (request, reply) => {
-    const { url, startUrl, format, compress, maxDepth, maxPages, delay } = request.body;
+    const { url, startUrl, format, compress, fontSize, maxDepth, maxPages, delay } = request.body;
     const actualUrl = url || startUrl;
     if (!actualUrl) return reply.code(400).send({ error: 'url or startUrl is required' });
 
@@ -142,6 +145,7 @@ export async function convertRoutes(app: FastifyInstance): Promise<void> {
             url: actualUrl,
             format,
             compress,
+            fontSize,
             depth: maxDepth,
             maxPages,
             delay,
@@ -165,7 +169,7 @@ export async function convertRoutes(app: FastifyInstance): Promise<void> {
 
   /** POST /api/convert/list — convert a list of URLs to a combined PDF */
   app.post<{ Body: ListBody }>('/api/convert/list', async (request, reply) => {
-    const { urls, format, compress } = request.body;
+    const { urls, format, compress, fontSize } = request.body;
     if (!urls || !Array.isArray(urls) || urls.length === 0) {
       return reply.code(400).send({ error: 'urls array is required' });
     }
@@ -183,7 +187,7 @@ export async function convertRoutes(app: FastifyInstance): Promise<void> {
         const outputPath = path.join(getTempDir(), `${slug}-combined-${jobId.slice(0,8)}.pdf`);
 
         const result = await withConsoleCapture(jobId, () =>
-          runList({ urls, format, compress, output: outputPath }),
+          runList({ urls, format, compress, fontSize, output: outputPath }),
         );
         await shutdown();
         completeJob(jobId, result, `${slug}-combined.pdf`);

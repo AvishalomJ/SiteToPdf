@@ -25,58 +25,54 @@ function getTempDir(): string {
 export async function imageRoutes(app: FastifyInstance): Promise<void> {
   /** POST /api/convert/images-to-pdf — convert multiple images to a single PDF */
   app.post('/api/convert/images-to-pdf', async (request, reply) => {
+    // 1. Consume ALL multipart parts before sending the response
+    const parts = request.parts();
+    const imageBuffers: Buffer[] = [];
+    let fileCount = 0;
+
+    for await (const part of parts) {
+      if (part.type === 'file') {
+        const file = part as MultipartFile;
+
+        if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+          throw new Error(
+            `Invalid file type: ${file.mimetype}. Only PNG and JPEG images are allowed.`,
+          );
+        }
+
+        fileCount++;
+        if (fileCount > MAX_FILES) {
+          throw new Error(`Too many files. Maximum ${MAX_FILES} images allowed.`);
+        }
+
+        const chunks: Buffer[] = [];
+        for await (const chunk of file.file) {
+          chunks.push(chunk);
+        }
+        const buffer = Buffer.concat(chunks);
+
+        if (buffer.length > MAX_FILE_SIZE) {
+          throw new Error(
+            `File too large: ${file.filename}. Maximum size is 20MB per file.`,
+          );
+        }
+
+        imageBuffers.push(buffer);
+      }
+    }
+
+    if (imageBuffers.length === 0) {
+      return reply.code(400).send({ error: 'No valid image files uploaded' });
+    }
+
+    // 2. Create job and reply
     const jobId = createJob();
     reply.send({ jobId });
 
+    // 3. Process in background using already-consumed buffers
     setImmediate(async () => {
       try {
         await pool.acquire();
-        updateProgress(jobId, 'Receiving image uploads...');
-
-        const parts = request.parts();
-        const imageBuffers: Buffer[] = [];
-        let fileCount = 0;
-
-        for await (const part of parts) {
-          if (part.type === 'file') {
-            const file = part as MultipartFile;
-
-            // Validate MIME type
-            if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-              throw new Error(
-                `Invalid file type: ${file.mimetype}. Only PNG and JPEG images are allowed.`,
-              );
-            }
-
-            // Check file count
-            fileCount++;
-            if (fileCount > MAX_FILES) {
-              throw new Error(`Too many files. Maximum ${MAX_FILES} images allowed.`);
-            }
-
-            // Read file to buffer
-            const chunks: Buffer[] = [];
-            for await (const chunk of file.file) {
-              chunks.push(chunk);
-            }
-            const buffer = Buffer.concat(chunks);
-
-            // Check file size
-            if (buffer.length > MAX_FILE_SIZE) {
-              throw new Error(
-                `File too large: ${file.filename}. Maximum size is 20MB per file.`,
-              );
-            }
-
-            imageBuffers.push(buffer);
-            updateProgress(jobId, `Received: ${file.filename} (${(buffer.length / 1024).toFixed(1)} KB)`);
-          }
-        }
-
-        if (imageBuffers.length === 0) {
-          throw new Error('No valid image files uploaded');
-        }
-
         updateProgress(jobId, `Processing ${imageBuffers.length} image(s)...`);
 
         // Create PDF

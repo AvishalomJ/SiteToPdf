@@ -51,6 +51,12 @@ const imageFileList = document.getElementById('imageFileList');
 const optionsSection = document.getElementById('optionsSection');
 const formatGroup = document.getElementById('formatGroup');
 const compressGroup = document.getElementById('compressGroup');
+const fontSizeGroup = document.getElementById('fontSizeGroup');
+const fontSizeSelect = document.getElementById('fontSizeSelect');
+const pulsingDot = document.getElementById('pulsingDot');
+
+// Track object URLs for image thumbnails so we can revoke them
+let imageObjectUrls = [];
 
 // Settings elements
 const settingsBtn = document.getElementById('settingsBtn');
@@ -115,20 +121,24 @@ function updateVisibleSections() {
   imageSection.classList.add('hidden');
   formatGroup.classList.remove('hidden');
   compressGroup.classList.remove('hidden');
+  fontSizeGroup.classList.add('hidden');
   urlInput.required = false;
   urlListInput.required = false;
 
   if (currentMode === 'single') {
     singleUrlSection.classList.remove('hidden');
+    fontSizeGroup.classList.remove('hidden');
     urlInput.required = true;
     btnText.textContent = 'Convert to PDF';
   } else if (currentMode === 'crawl') {
     singleUrlSection.classList.remove('hidden');
     crawlOptionsSection.classList.remove('hidden');
+    fontSizeGroup.classList.remove('hidden');
     urlInput.required = true;
     btnText.textContent = 'Convert to PDF';
   } else if (currentMode === 'list') {
     urlListSection.classList.remove('hidden');
+    fontSizeGroup.classList.remove('hidden');
     urlListInput.required = true;
     btnText.textContent = 'Convert to PDF';
   } else if (currentMode === 'summarize') {
@@ -244,15 +254,25 @@ addImageFilesBtn.addEventListener('click', async () => {
   }
 });
 
+function revokeImageObjectUrls() {
+  imageObjectUrls.forEach(url => URL.revokeObjectURL(url));
+  imageObjectUrls = [];
+}
+
 function renderImageFileList() {
+  revokeImageObjectUrls();
+
   if (imageFiles.length === 0) {
     imageFileList.innerHTML = '<div class="merge-empty-state">No images selected. Click "Add Images" to begin.</div>';
     return;
   }
   imageFileList.innerHTML = imageFiles.map((filePath, index) => {
     const filename = filePath.split(/[\\/]/).pop();
+    // Create a thumbnail using a file:// URL (Electron has local file access)
+    const thumbnailSrc = 'file:///' + filePath.replace(/\\/g, '/');
     return `
       <div class="merge-file-item" data-index="${index}">
+        <img class="image-thumbnail" src="${thumbnailSrc}" alt="${filename}" />
         <span class="merge-file-number">${index + 1}.</span>
         <span class="merge-file-name" title="${filePath}">${filename}</span>
         <div class="merge-file-actions">
@@ -391,6 +411,7 @@ form.addEventListener('submit', async (e) => {
       format: formatSelect.value,
       compress: compressToggle.checked,
       output: outputPath.value || undefined,
+      fontSize: fontSizeSelect.value,
     };
     
     if (currentMode === 'single') {
@@ -560,6 +581,7 @@ function setConverting(converting) {
   const formCard = document.querySelector('.form-card');
   if (converting) {
     formCard.classList.add('converting');
+    pulsingDot.classList.remove('hidden');
     if (currentMode === 'summarize') {
       btnText.textContent = 'Summarizing...';
     } else if (currentMode === 'merge') {
@@ -570,6 +592,7 @@ function setConverting(converting) {
     btnSpinner.classList.remove('hidden');
   } else {
     formCard.classList.remove('converting');
+    pulsingDot.classList.add('hidden');
     if (currentMode === 'summarize') {
       btnText.textContent = 'Summarize';
     } else if (currentMode === 'merge') {
@@ -588,9 +611,12 @@ function showResult(success, data) {
     const filename = data.split(/[\\/]/).pop();
     const gmailSubject = encodeURIComponent(`SiteToPdf: ${filename}`);
     const gmailBody = encodeURIComponent(
-      `Hi,\n\nI'd like to share a PDF document with you: "${filename}"\n\nThis document was generated from a website using SiteToPdf.\n\nPlease note: The PDF file needs to be attached manually.\nFile location: ${data}\n\nBest regards`
+      `I've attached a PDF: ${filename}\n\nGenerated with SiteToPdf.\n\nFile location: ${data}\nPlease attach the file from the above location.`
     );
     const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&su=${gmailSubject}&body=${gmailBody}`;
+
+    const whatsappMessage = encodeURIComponent(`Check out this PDF: ${filename} - Generated with SiteToPdf`);
+    const whatsappUrl = `https://wa.me/?text=${whatsappMessage}`;
 
     resultContent.innerHTML = `
       <div class="result-success">
@@ -602,6 +628,7 @@ function showResult(success, data) {
           <button id="openPdfBtn">Open PDF</button>
           <button id="openFolderBtn">Open Folder</button>
           <button id="gmailBtn">📧 Send via Gmail</button>
+          <button id="whatsappBtn" class="btn-whatsapp">💬 Share via WhatsApp</button>
         </div>
       </div>
     `;
@@ -616,6 +643,10 @@ function showResult(success, data) {
 
     document.getElementById('gmailBtn').addEventListener('click', () => {
       window.open(gmailUrl, '_blank');
+    });
+
+    document.getElementById('whatsappBtn').addEventListener('click', () => {
+      window.open(whatsappUrl, '_blank');
     });
   } else {
     resultContent.innerHTML = `

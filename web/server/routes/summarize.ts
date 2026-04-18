@@ -27,6 +27,20 @@ interface SummarizeBody {
   apiKey: string;
 }
 
+function urlToSlug(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const raw = (parsed.hostname + parsed.pathname)
+      .replace(/[.\/_]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .toLowerCase();
+    return raw.slice(0, 60) || 'output';
+  } catch {
+    return 'output';
+  }
+}
+
 function getTempDir(): string {
   const dir = path.join(os.tmpdir(), 'sitetopdf-jobs');
   const fs = require('fs');
@@ -90,7 +104,8 @@ export async function summarizeRoutes(app: FastifyInstance): Promise<void> {
         await generatePdf(summaryContent, { outputPath, title: summaryContent.title }, url);
         await shutdown();
 
-        completeJob(jobId, outputPath);
+        const slug = urlToSlug(url);
+        completeJob(jobId, outputPath, `${slug}-summary.pdf`);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         failJob(jobId, msg);

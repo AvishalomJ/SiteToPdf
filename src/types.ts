@@ -46,6 +46,8 @@ export interface PdfOptions {
   compress?: boolean;
   /** Target language code if content was translated (e.g., 'he' for Hebrew). */
   translate?: string;
+  /** Override body/heading font sizes. Takes precedence over compress for text sizing. */
+  fontSize?: 'small' | 'normal' | 'large';
 }
 
 // ── Pipeline types (for future multi-URL crawling) ──────────────

@@ -17,6 +17,7 @@ export interface PipelineOptions {
   format?: 'A4' | 'Letter';
   compress?: boolean;
   translate?: string;
+  fontSize?: 'small' | 'normal' | 'large';
 }
 
 /**
@@ -53,6 +54,7 @@ export async function runSingleUrl(options: PipelineOptions): Promise<string> {
       format: format ?? 'A4',
       compress: options.compress,
       translate: options.translate,
+      fontSize: options.fontSize,
     };
 
     console.log(`Generating PDF: ${outputPath}`);
@@ -76,6 +78,7 @@ export interface CrawlPipelineOptions {
   delay?: number;
   compress?: boolean;
   translate?: string;
+  fontSize?: 'small' | 'normal' | 'large';
 }
 
 /**
@@ -136,6 +139,7 @@ export async function runCrawl(options: CrawlPipelineOptions): Promise<string> {
       format: format ?? 'A4',
       compress: options.compress,
       translate: options.translate,
+      fontSize: options.fontSize,
     };
 
     console.log(`Generating PDF with ${pages.length} page(s): ${outputPath}`);
@@ -171,6 +175,7 @@ export interface ListPipelineOptions {
   format?: 'A4' | 'Letter';
   compress?: boolean;
   translate?: string;
+  fontSize?: 'small' | 'normal' | 'large';
 }
 
 /**
@@ -232,6 +237,7 @@ export async function runList(options: ListPipelineOptions): Promise<string> {
       format: format ?? 'A4',
       compress: options.compress,
       translate: options.translate,
+      fontSize: options.fontSize,
     };
 
     console.log(`\nGenerating PDF with ${pages.length} page(s): ${outputPath}`);

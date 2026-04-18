@@ -123,7 +123,7 @@ function createWindow() {
               type: 'info',
               title: 'About SiteToPdf',
               message: 'SiteToPdf',
-              detail: `Convert web pages to clean PDFs\nVersion ${app.getVersion()}`,
+              detail: `Convert, merge & transform — your all-in-one PDF toolkit\nVersion ${app.getVersion()}`,
             });
           },
         },
@@ -355,7 +355,7 @@ ipcMain.handle('check-for-update', async () => {
 });
 
 ipcMain.handle('install-update', async () => {
-  autoUpdater.quitAndInstall(false, true);
+  autoUpdater.quitAndInstall(true, true);
 });
 
 // --- PDF Merge ---

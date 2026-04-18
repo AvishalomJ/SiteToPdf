@@ -80,11 +80,18 @@ export async function jobRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const filename = job.displayFilename || path.basename(filePath);
-    reply.header('Content-Type', 'application/pdf');
-    reply.header('Content-Disposition', `attachment; filename="${filename}"`);
+    const stat = fs.statSync(filePath);
+
+    reply.raw.writeHead(200, {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': stat.size,
+    });
 
     const stream = fs.createReadStream(filePath);
-    reply.send(stream);
+    stream.pipe(reply.raw);
+
+    reply.hijack();          // tell Fastify we took over the response
 
     // Clean up after the response is sent
     reply.raw.on('finish', () => {

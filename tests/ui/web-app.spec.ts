@@ -11,7 +11,7 @@ test.describe('Page load', () => {
   test('header displays app name and subtitle', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('.app-title')).toContainText('SiteToPdf');
-    await expect(page.locator('.app-subtitle')).toContainText('Convert web pages');
+    await expect(page.locator('.app-subtitle')).toContainText('all-in-one PDF toolkit');
   });
 
   test('favicon SVG is loaded', async ({ page }) => {

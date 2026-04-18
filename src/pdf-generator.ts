@@ -331,6 +331,34 @@ const COMPRESSED_STYLES = `
 
 // ── RTL support ──────────────────────────────────────────────────
 
+// ── Font-size override ───────────────────────────────────────────
+
+/**
+ * Build CSS overrides for explicit font-size selection.
+ * Overrides body + heading sizes proportionally.
+ *   small  → 9pt body  (same ratios as COMPRESSED_STYLES)
+ *   normal → 11pt body (same ratios as PDF_STYLES)
+ *   large  → 13pt body (proportionally scaled up)
+ */
+function buildFontSizeOverrides(fontSize: 'small' | 'normal' | 'large'): string {
+  const map = {
+    small:  { body: '9pt',  h1: '18pt', h2: '14pt', h3: '12pt', h456: '10pt' },
+    normal: { body: '11pt', h1: '22pt', h2: '17pt', h3: '14pt', h456: '12pt' },
+    large:  { body: '13pt', h1: '26pt', h2: '20pt', h3: '16pt', h456: '14pt' },
+  };
+  const s = map[fontSize];
+  return `
+  /* ── Font-size override: ${fontSize} ─────────────── */
+  body { font-size: ${s.body}; }
+  h1 { font-size: ${s.h1}; }
+  h2 { font-size: ${s.h2}; }
+  h3 { font-size: ${s.h3}; }
+  h4, h5, h6 { font-size: ${s.h456}; }
+  `;
+}
+
+// ── RTL support ──────────────────────────────────────────────────
+
 function isRtlLanguage(lang?: string): boolean {
   return ['he', 'ar', 'fa', 'ur'].includes(lang ?? '');
 }
@@ -445,7 +473,7 @@ function formatDate(): string {
 
 // ── Single-page HTML wrapper ─────────────────────────────────────
 
-function wrapInHtmlDocument(content: ExtractedContent, sourceUrl?: string, compress = false, translate?: string): string {
+function wrapInHtmlDocument(content: ExtractedContent, sourceUrl?: string, compress = false, translate?: string, fontSize?: 'small' | 'normal' | 'large'): string {
   const rtl = isRtlLanguage(translate);
   const lang = translate || 'en';
   const dirAttr = rtl ? ` dir="rtl"` : '';
@@ -456,7 +484,10 @@ function wrapInHtmlDocument(content: ExtractedContent, sourceUrl?: string, compr
   }
 
   const baseStyles = compress ? COMPRESSED_STYLES : PDF_STYLES;
-  const styles = rtl ? baseStyles + buildRtlStyles(compress) : baseStyles;
+  let styles = rtl ? baseStyles + buildRtlStyles(compress) : baseStyles;
+  if (fontSize) {
+    styles += buildFontSizeOverrides(fontSize);
+  }
 
   // Bilingual title: show original title as reference when content is translated
   const originalTitleHtml = rtl && content.originalTitle
@@ -480,7 +511,7 @@ function wrapInHtmlDocument(content: ExtractedContent, sourceUrl?: string, compr
 
 // ── Multi-page HTML wrapper ──────────────────────────────────────
 
-function wrapMultiPageDocument(pages: PageEntry[], title?: string, compress = false, translate?: string): string {
+function wrapMultiPageDocument(pages: PageEntry[], title?: string, compress = false, translate?: string, fontSize?: 'small' | 'normal' | 'large'): string {
   const rtl = isRtlLanguage(translate);
   const lang = translate || 'en';
   const dirAttr = rtl ? ` dir="rtl"` : '';
@@ -488,7 +519,10 @@ function wrapMultiPageDocument(pages: PageEntry[], title?: string, compress = fa
   const date = formatDate();
 
   const baseStyles = compress ? COMPRESSED_STYLES : PDF_STYLES;
-  const styles = rtl ? baseStyles + buildRtlStyles(compress) : baseStyles;
+  let styles = rtl ? baseStyles + buildRtlStyles(compress) : baseStyles;
+  if (fontSize) {
+    styles += buildFontSizeOverrides(fontSize);
+  }
 
   const coverHtml = `
     <div class="cover-page">
@@ -562,10 +596,11 @@ export async function generatePdf(
 
   const compress = options.compress ?? false;
   const translate = options.translate;
+  const fontSize = options.fontSize;
   const rtl = isRtlLanguage(translate);
 
   try {
-    const htmlDoc = wrapInHtmlDocument(content, sourceUrl, compress, translate);
+    const htmlDoc = wrapInHtmlDocument(content, sourceUrl, compress, translate, fontSize);
     await page.setContent(htmlDoc, { waitUntil: 'networkidle' });
 
     await page.pdf({
@@ -606,10 +641,11 @@ export async function generateMultiPagePdf(
 
   const compress = options.compress ?? false;
   const translate = options.translate;
+  const fontSize = options.fontSize;
   const rtl = isRtlLanguage(translate);
 
   try {
-    const htmlDoc = wrapMultiPageDocument(pages, options.title, compress, translate);
+    const htmlDoc = wrapMultiPageDocument(pages, options.title, compress, translate, fontSize);
     await page.setContent(htmlDoc, { waitUntil: 'networkidle' });
 
     await page.pdf({

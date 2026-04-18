@@ -846,3 +846,4 @@ summaryModelSelect.addEventListener('change', () => {
 
 // ── Init ──
 loadModelSetting();
+updateVisibleSections();
