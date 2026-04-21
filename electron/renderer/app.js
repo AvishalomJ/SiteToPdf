@@ -58,6 +58,15 @@ const compressGroup = document.getElementById('compressGroup');
 const fontSizeGroup = document.getElementById('fontSizeGroup');
 const fontSizeSelect = document.getElementById('fontSizeSelect');
 const pulsingDot = document.getElementById('pulsingDot');
+const youtubeSection = document.getElementById('youtubeSection');
+const youtubeUrlInput = document.getElementById('youtubeUrlInput');
+const fetchYtInfoBtn = document.getElementById('fetchYtInfoBtn');
+const youtubePreview = document.getElementById('youtubePreview');
+const ytThumbnail = document.getElementById('ytThumbnail');
+const ytTitle = document.getElementById('ytTitle');
+const ytDuration = document.getElementById('ytDuration');
+const ytFormatSelect = document.getElementById('ytFormatSelect');
+const ytQualitySelect = document.getElementById('ytQualitySelect');
 
 // Track object URLs for image thumbnails so we can revoke them
 let imageObjectUrls = [];
@@ -104,7 +113,7 @@ navTabs.forEach(tab => {
     } else {
       convertModes.classList.add('hidden');
       toolsModes.classList.remove('hidden');
-      if (!['merge', 'summarize', 'imagetopdf'].includes(currentMode)) {
+      if (!['merge', 'summarize', 'imagetopdf', 'youtube'].includes(currentMode)) {
         currentMode = 'merge';
         document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === currentMode));
         updateVisibleSections();
@@ -123,6 +132,7 @@ function updateVisibleSections() {
   summaryModelGroup.classList.add('hidden');
   mergeSection.classList.add('hidden');
   imageSection.classList.add('hidden');
+  youtubeSection.classList.add('hidden');
   formatGroup.classList.remove('hidden');
   compressGroup.classList.remove('hidden');
   fontSizeGroup.classList.add('hidden');
@@ -161,6 +171,11 @@ function updateVisibleSections() {
     formatGroup.classList.add('hidden');
     compressGroup.classList.add('hidden');
     btnText.textContent = 'Convert to PDF';
+  } else if (currentMode === 'youtube') {
+    youtubeSection.classList.remove('hidden');
+    formatGroup.classList.add('hidden');
+    compressGroup.classList.add('hidden');
+    btnText.textContent = 'Download';
   }
 }
 
@@ -410,6 +425,12 @@ form.addEventListener('submit', async (e) => {
   resultCard.classList.add('hidden');
   summaryCard.classList.add('hidden');
 
+  // YouTube mode
+  if (currentMode === 'youtube') {
+    await handleYouTubeDownload();
+    return;
+  }
+
   // Summarize mode
   if (currentMode === 'summarize') {
     await handleSummarize();
@@ -611,6 +632,127 @@ function showSummary(title, summaryText) {
   summaryBody.innerHTML = `<p>${formatted}</p>`;
 }
 
+// --- YouTube Download ---
+
+const YT_API_BASE = 'http://localhost:3000';
+
+ytFormatSelect.addEventListener('change', () => {
+  const isAudio = ytFormatSelect.value === 'audio';
+  ytQualitySelect.innerHTML = isAudio
+    ? '<option value="320">320 kbps</option><option value="192" selected>192 kbps</option><option value="128">128 kbps</option>'
+    : '<option value="1080">1080p</option><option value="720">720p</option><option value="480">480p</option><option value="360">360p</option>';
+});
+
+fetchYtInfoBtn.addEventListener('click', async () => {
+  const url = youtubeUrlInput.value.trim();
+  if (!url) { addLogEntry('Please enter a YouTube URL', 'error'); return; }
+
+  fetchYtInfoBtn.disabled = true;
+  fetchYtInfoBtn.textContent = 'Fetching...';
+  addLogEntry('Fetching video info...', 'info');
+
+  try {
+    const resp = await fetch(`${YT_API_BASE}/api/youtube/info`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: resp.statusText }));
+      throw new Error(err.error || `HTTP ${resp.status}`);
+    }
+    const info = await resp.json();
+
+    youtubePreview.classList.remove('hidden');
+    ytThumbnail.src = info.thumbnail || '';
+    ytTitle.textContent = info.title || 'Unknown';
+    ytDuration.textContent = info.duration ? `Duration: ${info.duration}` : '';
+    addLogEntry(`Video: ${info.title}`, 'success');
+  } catch (error) {
+    addLogEntry(`Error: ${error.message}`, 'error');
+    youtubePreview.classList.add('hidden');
+  } finally {
+    fetchYtInfoBtn.disabled = false;
+    fetchYtInfoBtn.textContent = 'Fetch';
+  }
+});
+
+function classifyLogMessage(msg) {
+  if (!msg) return 'info';
+  if (msg.includes('✅') || msg.toLowerCase().includes('success') || msg.toLowerCase().includes('complete')) return 'success';
+  if (msg.includes('⚠') || msg.toLowerCase().includes('warn')) return 'warning';
+  if (msg.includes('❌') || msg.toLowerCase().includes('error') || msg.toLowerCase().includes('fail')) return 'error';
+  return 'info';
+}
+
+async function handleYouTubeDownload() {
+  const url = youtubeUrlInput.value.trim();
+  if (!url) { addLogEntry('Please enter a YouTube URL', 'error'); return; }
+
+  setConverting(true);
+  addLogEntry('Starting YouTube download...', 'info');
+
+  document.getElementById('progressCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  try {
+    const format = ytFormatSelect.value;
+    const quality = ytQualitySelect.value;
+
+    const resp = await fetch(`${YT_API_BASE}/api/youtube/download`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, format, quality }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: resp.statusText }));
+      throw new Error(err.error || `HTTP ${resp.status}`);
+    }
+    const { jobId } = await resp.json();
+    addLogEntry(`Download job: ${jobId}`, 'info');
+
+    // Poll job status via SSE
+    const result = await new Promise((resolve, reject) => {
+      const es = new EventSource(`${YT_API_BASE}/api/jobs/${jobId}/status`);
+      es.addEventListener('progress', (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          addLogEntry(data.message || e.data, classifyLogMessage(data.message || e.data));
+        } catch { addLogEntry(e.data); }
+      });
+      es.addEventListener('complete', (e) => {
+        es.close();
+        try { resolve(JSON.parse(e.data)); } catch { resolve({ jobId }); }
+      });
+      es.addEventListener('error', (e) => {
+        es.close();
+        if (e.data) {
+          try { reject(new Error(JSON.parse(e.data).error || 'Failed')); } catch { reject(new Error(e.data)); }
+        } else {
+          reject(new Error('Connection lost'));
+        }
+      });
+    });
+
+    // Download the file
+    const filename = result.displayFilename || `download.${format === 'audio' ? 'mp3' : 'mp4'}`;
+    const downloadResp = await fetch(`${YT_API_BASE}/api/jobs/${result.jobId || jobId}/download`);
+    if (downloadResp.ok) {
+      const blob = await downloadResp.blob();
+      const savePath = await window.siteToPdf.chooseSavePath(filename);
+      if (savePath) {
+        const buffer = await blob.arrayBuffer();
+        await window.siteToPdf.writeFile(savePath, new Uint8Array(buffer));
+        addLogEntry(`✅ Saved to: ${savePath}`, 'success');
+      }
+    }
+    playSuccessSound();
+  } catch (error) {
+    addLogEntry(`Error: ${error.message}`, 'error');
+  } finally {
+    setConverting(false);
+  }
+}
+
 function setConverting(converting) {
   isConverting = converting;
   convertBtn.disabled = converting;
@@ -623,6 +765,8 @@ function setConverting(converting) {
       btnText.textContent = 'Summarizing...';
     } else if (currentMode === 'merge') {
       btnText.textContent = 'Merging...';
+    } else if (currentMode === 'youtube') {
+      btnText.textContent = 'Downloading...';
     } else {
       btnText.textContent = 'Converting...';
     }
@@ -634,6 +778,8 @@ function setConverting(converting) {
       btnText.textContent = 'Summarize';
     } else if (currentMode === 'merge') {
       btnText.textContent = 'Merge PDFs';
+    } else if (currentMode === 'youtube') {
+      btnText.textContent = 'Download';
     } else {
       btnText.textContent = 'Convert to PDF';
     }
