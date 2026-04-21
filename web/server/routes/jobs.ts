@@ -81,8 +81,16 @@ export async function jobRoutes(app: FastifyInstance): Promise<void> {
 
     const filename = job.displayFilename || path.basename(filePath);
     const stat = fs.statSync(filePath);
-    const isZip = filePath.endsWith('.zip');
-    const contentType = isZip ? 'application/zip' : 'application/pdf';
+    const ext = path.extname(filePath).toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      '.pdf': 'application/pdf',
+      '.zip': 'application/zip',
+      '.mp3': 'audio/mpeg',
+      '.mp4': 'video/mp4',
+      '.m4a': 'audio/mp4',
+      '.webm': 'video/webm',
+    };
+    const contentType = mimeTypes[ext] || 'application/octet-stream';
 
     reply.raw.writeHead(200, {
       'Content-Type': contentType,

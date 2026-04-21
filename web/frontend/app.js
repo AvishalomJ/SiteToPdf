@@ -55,6 +55,15 @@ const compressGroup = document.getElementById('compressGroup');
 const progressDot = document.getElementById('progressDot');
 const fontSizeGroup = document.getElementById('fontSizeGroup');
 const fontSizeSelect = document.getElementById('fontSizeSelect');
+const youtubeSection = document.getElementById('youtubeSection');
+const youtubeUrlInput = document.getElementById('youtubeUrlInput');
+const fetchYtInfoBtn = document.getElementById('fetchYtInfoBtn');
+const youtubePreview = document.getElementById('youtubePreview');
+const ytThumbnail = document.getElementById('ytThumbnail');
+const ytTitle = document.getElementById('ytTitle');
+const ytDuration = document.getElementById('ytDuration');
+const ytFormatSelect = document.getElementById('ytFormatSelect');
+const ytQualitySelect = document.getElementById('ytQualitySelect');
 
 // Settings elements
 const settingsBtn = document.getElementById('settingsBtn');
@@ -89,7 +98,7 @@ navTabs.forEach(tab => {
     } else {
       convertModes.classList.add('hidden');
       toolsModes.classList.remove('hidden');
-      if (!['merge', 'summarize', 'imagetopdf'].includes(currentMode)) {
+      if (!['merge', 'summarize', 'imagetopdf', 'youtube'].includes(currentMode)) {
         currentMode = 'merge';
         updateModeButtons();
         updateVisibleSections();
@@ -122,6 +131,7 @@ function updateVisibleSections() {
   summaryModelGroup.classList.add('hidden');
   mergeSection.classList.add('hidden');
   imageSection.classList.add('hidden');
+  youtubeSection.classList.add('hidden');
   fontSizeGroup.classList.add('hidden');
   formatGroup.classList.remove('hidden');
   compressGroup.classList.remove('hidden');
@@ -160,6 +170,11 @@ function updateVisibleSections() {
     formatGroup.classList.add('hidden');
     compressGroup.classList.add('hidden');
     btnText.textContent = 'Convert to PDF';
+  } else if (currentMode === 'youtube') {
+    youtubeSection.classList.remove('hidden');
+    formatGroup.classList.add('hidden');
+    compressGroup.classList.add('hidden');
+    btnText.textContent = 'Download';
   }
 }
 
@@ -467,6 +482,10 @@ form.addEventListener('submit', async (e) => {
     await handleImageToPdf();
     return;
   }
+  if (currentMode === 'youtube') {
+    await handleYouTubeDownload();
+    return;
+  }
 
   setConverting(true);
   addLogEntry('Starting conversion...', 'info');
@@ -528,6 +547,79 @@ form.addEventListener('submit', async (e) => {
     setConverting(false);
   }
 });
+
+// ── YouTube Format/Quality Switching ──
+ytFormatSelect.addEventListener('change', () => {
+  const isAudio = ytFormatSelect.value === 'audio';
+  ytQualitySelect.innerHTML = isAudio
+    ? '<option value="320">320 kbps</option><option value="192" selected>192 kbps</option><option value="128">128 kbps</option>'
+    : '<option value="1080">1080p</option><option value="720">720p</option><option value="480">480p</option><option value="360">360p</option>';
+});
+
+// ── Fetch YouTube Info ──
+fetchYtInfoBtn.addEventListener('click', async () => {
+  const url = youtubeUrlInput.value.trim();
+  if (!url) { addLogEntry('Please enter a YouTube URL', 'error'); return; }
+
+  fetchYtInfoBtn.disabled = true;
+  fetchYtInfoBtn.textContent = 'Fetching...';
+  addLogEntry('Fetching video info...', 'info');
+
+  try {
+    const resp = await fetch('/api/youtube/info', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: resp.statusText }));
+      throw new Error(err.error || `HTTP ${resp.status}`);
+    }
+    const info = await resp.json();
+
+    youtubePreview.classList.remove('hidden');
+    ytThumbnail.src = info.thumbnail || '';
+    ytTitle.textContent = info.title || 'Unknown title';
+    ytDuration.textContent = info.duration ? `Duration: ${info.duration}` : '';
+    addLogEntry(`Video found: ${info.title}`, 'success');
+  } catch (error) {
+    addLogEntry(`Error: ${error.message}`, 'error');
+    youtubePreview.classList.add('hidden');
+  } finally {
+    fetchYtInfoBtn.disabled = false;
+    fetchYtInfoBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Fetch';
+  }
+});
+
+// ── YouTube Download Handler ──
+async function handleYouTubeDownload() {
+  const url = youtubeUrlInput.value.trim();
+  if (!url) { addLogEntry('Please enter a YouTube URL', 'error'); return; }
+
+  setConverting(true);
+  addLogEntry('Starting YouTube download...', 'info');
+  document.getElementById('progressCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  try {
+    const format = ytFormatSelect.value;
+    const quality = ytQualitySelect.value;
+
+    const { jobId } = await postJSON('/api/youtube/download', { url, format, quality });
+    addLogEntry(`Download job started: ${jobId}`, 'info');
+
+    const result = await connectJobSSE(jobId);
+
+    const isAudio = format === 'audio';
+    addLogEntry(`✅ ${isAudio ? 'Audio' : 'Video'} downloaded successfully`, 'success');
+    showResult(true, result);
+    playSuccessSound();
+  } catch (error) {
+    addLogEntry(`Error: ${error.message}`, 'error');
+    showResult(false, error.message);
+  } finally {
+    setConverting(false);
+  }
+}
 
 // ── Image to PDF Handler ──
 async function handleImageToPdf() {
@@ -719,6 +811,8 @@ function setConverting(converting) {
       btnText.textContent = 'Summarizing...';
     } else if (currentMode === 'merge') {
       btnText.textContent = 'Merging...';
+    } else if (currentMode === 'youtube') {
+      btnText.textContent = 'Downloading...';
     } else {
       btnText.textContent = 'Converting...';
     }
@@ -732,6 +826,8 @@ function setConverting(converting) {
       btnText.textContent = 'Merge PDFs';
     } else if (currentMode === 'imagetopdf') {
       btnText.textContent = 'Convert to PDF';
+    } else if (currentMode === 'youtube') {
+      btnText.textContent = 'Download';
     } else {
       btnText.textContent = 'Convert to PDF';
     }
@@ -770,6 +866,9 @@ function showResult(success, data) {
     // data can be a string (jobId) or an object { jobId, displayFilename }
     const jobId = typeof data === 'string' ? data : (data.jobId || data);
     const filename = (typeof data === 'object' && data.displayFilename) ? data.displayFilename : `SiteToPdf-${jobId}.pdf`;
+    const ext = filename.split('.').pop().toLowerCase();
+    const isMedia = ['mp3', 'mp4', 'webm', 'm4a'].includes(ext);
+    const fileLabel = isMedia ? (ext === 'mp3' || ext === 'm4a' ? 'Audio' : 'Video') : 'PDF';
     const downloadUrl = `/api/jobs/${jobId}/download`;
     const gmailSubject = encodeURIComponent(`SiteToPdf: ${filename}`);
     const gmailBody = encodeURIComponent(
@@ -783,7 +882,7 @@ function showResult(success, data) {
       <div class="result-success">
         <div class="result-message success">
           <span>✅</span>
-          <span>PDF generated: ${filename}</span>
+          <span>${fileLabel} ready: ${filename}</span>
         </div>
         <div class="result-actions">
           <a href="${downloadUrl}" class="btn-download" download="${filename}">
@@ -792,7 +891,7 @@ function showResult(success, data) {
               <polyline points="7 10 12 15 17 10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
-            Download PDF
+            Download ${fileLabel}
           </a>
           <button type="button" class="btn-download btn-gmail" id="gmailShareBtn">
             📧 Send via Gmail

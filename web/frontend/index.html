@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; img-src 'self' blob:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; img-src 'self' blob: https://i.ytimg.com https://img.youtube.com">
   <title>SiteToPdf — Web</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="styles.css">
@@ -62,6 +62,7 @@
             <button type="button" class="mode-btn" data-mode="merge">Merge PDFs</button>
             <button type="button" class="mode-btn" data-mode="summarize">Summarize</button>
             <button type="button" class="mode-btn" data-mode="imagetopdf">Image → PDF</button>
+            <button type="button" class="mode-btn" data-mode="youtube">YouTube ↓</button>
           </div>
         </div>
 
@@ -109,6 +110,43 @@
           </button>
           <div id="imageFileList" class="merge-file-list">
             <div class="merge-empty-state">No images selected. Click "Add Images" to begin.</div>
+          </div>
+        </div>
+
+        <!-- YouTube Download Section (hidden by default) -->
+        <div class="section hidden" id="youtubeSection">
+          <label class="section-label">YouTube Video URL</label>
+          <div class="youtube-input-row">
+            <input type="url" id="youtubeUrlInput" class="input-field" placeholder="https://www.youtube.com/watch?v=..." />
+            <button type="button" id="fetchYtInfoBtn" class="btn-secondary btn-fetch-info">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              Fetch
+            </button>
+          </div>
+          <div id="youtubePreview" class="youtube-preview hidden">
+            <img id="ytThumbnail" class="yt-thumbnail" src="" alt="Video thumbnail" />
+            <div class="yt-info">
+              <div id="ytTitle" class="yt-title"></div>
+              <div id="ytDuration" class="yt-duration"></div>
+            </div>
+          </div>
+          <div class="options-grid" style="margin-top: 0.75rem;">
+            <div class="option-group">
+              <label for="ytFormatSelect" class="option-label">Format</label>
+              <select id="ytFormatSelect" class="select-field">
+                <option value="video">Video (MP4)</option>
+                <option value="audio">Audio (MP3)</option>
+              </select>
+            </div>
+            <div class="option-group">
+              <label for="ytQualitySelect" class="option-label">Quality</label>
+              <select id="ytQualitySelect" class="select-field">
+                <option value="1080">1080p</option>
+                <option value="720">720p</option>
+                <option value="480">480p</option>
+                <option value="360">360p</option>
+              </select>
+            </div>
           </div>
         </div>
 
